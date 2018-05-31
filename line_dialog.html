@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Dialog @ Line</title>
+		
+		<style>
+@import "css/itahm.css";
+
+body {
+	margin: 0; padding: 0;
+	position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: rgba(0, 0, 0, .8);
+}
+
+h2 {
+	margin: 0; padding: 10px;
+	background-color: #0084ff;
+	color: #fff;
+}
+
+.dialog {
+	padding: 20px;
+	background-color: #fff;
+}
+
+input[type="checkbox"] {
+	vertical-align: middle;
+}
+
+.layout {
+	display: flex;
+	margin: 1em 0; padding: 1em;
+	border: 1px solid #aaa;
+}
+
+.layout_top {
+	height: 70px;
+}
+
+.layout_box {
+	position: relative;
+	padding: 10px;
+	box-sizing: border-box;
+	width: 160px;
+}
+
+.fill_box {
+	width: 100%;
+	box-sizing: border-box;
+	padding: .5em;
+}
+
+.name {
+	overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+footer {
+	display: flex;
+	margin-top: 1em;
+}
+
+footer input {
+	flex: 1;
+	border-radius: 1.2em;
+	background-color: #0084ff;
+	color: #fff;
+	border: .2em solid transparent;
+	padding: .5em;
+}
+
+footer input:hover {
+	background-color: #fff;
+	color: #0084ff;
+	border-color: #0084ff;
+}
+
+.loading_mask {
+	position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+	background: rgba(255, 255, 255, .5) url(/img/loading.gif) no-repeat center;
+	background-size: 32px 32px;
+}
+
+.layout_box:not(.loading)> .loading_mask {
+	display: none;
+}
+
+body:not(.removable) .remove{
+	display: none;
+}
+
+		</style>
+		
+		<script>
+
+function onApply(e) {
+	e.preventDefault();
+
+	top.databases.position[window.id].ifEntry[window.peerID]
+		= window.peerLeft.disabled? null: {
+			index: window.peerLeft.value,
+			name: window.peerLeft.options[window.peerLeft.selectedIndex].text
+		};
+	
+	top.databases.position[window.peerID].ifEntry[window.id]
+		= window.peerRight.disabled? null: {
+			index: window.peerRight.value,
+			name: window.peerRight.options[window.peerRight.selectedIndex].text
+		};
+	
+	window.opener.reload();
+	
+	top.closeDialog();
+}
+
+function onRemove(e) {
+	if (!confirm("연결을 삭제하겠습니까?")) {
+		return this.checked = false;
+	}
+	
+	delete top.databases.position[window.id].ifEntry[window.peerID];
+	delete top.databases.position[window.peerID].ifEntry[window.id];
+	
+	window.opener.reload();
+	
+	top.closeDialog();
+}
+
+function onCancel(e) {
+	top.closeDialog();
+}
+
+function initPort(e, ifEntry) {
+	var df = document.createDocumentFragment(),
+		opt, port, count = 0;
+	
+	for (var index in ifEntry) {
+		port = ifEntry[index];
+		
+		if (!port || !port.ifName) {
+			continue;
+		}
+		
+		opt = df.appendChild(document.createElement("option"));
+		
+		opt.value = index;
+		opt.text = port.ifName;
+		opt.title = port.ifDescr;
+		
+		count++;
+	}
+	
+	if (count > 0) {
+		e.appendChild(df);
+		e.selectedIndex = -1;
+		
+		e.disabled = false;
+	}
+}
+
+function setPort(device, id, peerID, e1, e2, box, selectBox) {
+	const monitorData = top.databases.monitor;
+	
+	e1.textContent = device.ip;
+	e2.textContent = device.name;
+	
+	if (device.ip && device.ip in monitorData && monitorData[device.ip].protocol === "snmp") {
+		box.classList.add("loading");
+		
+		top.sendRequest({
+			command: "select",
+			ip: device.ip
+		}, function (data) {
+			const ifEntry = top.databases.position[id].ifEntry;
+			
+			initPort(selectBox, data.ifEntry);
+			
+			if (ifEntry[peerID]) {
+				selectBox.value = ifEntry[peerID].index;
+			}
+				
+			box.classList.remove("loading");
+		});
+	}
+}
+
+function initialize(id, peerID) {
+	var device;
+	
+	window.opener = this && this.location;
+	window.id = id;
+	window.peerID = peerID;
+	
+	setPort(top.databases.device[id], id, peerID,
+		document.getElementById("ip"),
+		document.getElementById("name"),
+		document.querySelector(".layout_box.left"),
+		window.peerLeft);
+	
+	setPort(top.databases.device[peerID], peerID, id,
+			document.getElementById("peer_ip"),
+			document.getElementById("peer_name"),
+			document.querySelector(".layout_box.right"),
+			window.peerRight);
+	
+	if (peerID in top.databases.position[id].ifEntry) {
+		document.body.classList.add("removable");
+	}
+}
+
+		</script>
+	</head>
+	
+	<body>
+	
+		<form class="dialog rounded" autocomplete="off">
+			<h2>Line</h2>
+			
+				<div class="layout">
+					<div class="layout_box left">
+						<div class="layout_top">
+							<h3 id="name" class="name"></h3>
+							<i id="ip"></i>
+						</div>
+						<select class="fill_box" id="left" required disabled></select>
+						<div class="loading_mask"></div>
+					</div>
+					<div class="layout_box right">
+						<div class="layout_top">
+							<h3 id="peer_name" class="name"></h3>
+							<i id="peer_ip"></i>
+						</div>
+						<select class="fill_box" id="right" required disabled></select>
+						<div class="loading_mask"></div>
+					</div>
+				</div>
+				<label class="remove"><input type="checkbox" name="remove" disabled>remove</label>
+				<footer>
+					<input type="reset" value="cancel">
+					<input type="submit" value="apply" disabled>
+				</footer>
+		</form>
+		
+		<script>
+
+var form = document.querySelector("form"),
+	peerLeft = document.getElementById("left"),
+	peerRight = document.getElementById("right");
+	
+form.onreset = onCancel;
+
+if (top.databases.local.level === 0) {
+	form.addEventListener("submit", onApply);
+	form.elements["remove"].onclick = onRemove;
+	form.elements["remove"].disabled = false;
+	document.querySelector("input[type=submit]").disabled = false;
+}
+
+		</script>
+	
+	</body>
+	
+</html>

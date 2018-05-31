@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Critical Dialog @ ITAhM</title>
+		
+		<style>
+@import "css/itahm.css";
+		
+body {
+	margin: 0; padding: 0;
+	position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: rgba(0, 0, 0, .8);
+}
+
+.dialog {
+	padding: 20px;
+	background-color: #fff;
+	position: relative;
+}
+
+section {
+	border: 1px solid #aaa;
+	padding: 1em;
+	margin: 1em 0;
+}
+
+ul {
+	list-style: none;
+	padding: 0; margin: 0;
+}
+
+h2 {
+	background-color: #0084ff;
+	padding: 10px; margin: 0;
+	color: #fff;
+}
+
+#name {
+	margin-left: 1em;
+}
+
+#ip {
+	display: inline-block;
+	float: right;
+	font-size: 0.8em;
+}
+
+header> .item> li {
+	font-weight: bold;
+	text-align: center;
+}
+
+header> .item> li:last-child {
+	visibility: hidden;
+}
+
+.item {
+	display: flex;
+	cursor: pointer;
+	padding: .5em;
+	transition-duration: .3s;
+	height: 16px;
+}
+
+header> .item {
+	cursor: initial;
+}
+
+.item> li {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.item> li:first-child {
+	flex: 2;
+}
+
+.item> li:last-child {
+	flex: none;
+	width: 20px;
+	background: transparent url(img/remove.png) center no-repeat;
+	cursor: pointer;
+}
+
+#list {
+	max-height: 120px;
+	overflow: auto;
+	margin: 10px 0;
+	border-top: 1px solid #aaa;
+	border-bottom: 1px solid #aaa;
+}
+
+#list> .item> li {
+	text-align: right;
+}
+
+#list> .item> li:first-child {
+	text-align: left;
+}
+
+input:not([type="checkbox"]),
+select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: .5em;
+}
+
+input[type="checkbox"] {
+	vertical-align: middle;
+}
+
+.form {
+	margin-bottom: 10px;
+}
+
+.form ul {
+	display: flex;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.form li:first-child {
+	text-align: right;
+	padding: .5em;
+	flex: 1;
+}
+
+.form li:last-child {
+	flex: 2;
+}
+
+footer {
+	display: flex;
+	margin-top: 1em;
+}
+
+footer> input {
+	flex: 1;
+	border-radius: 1.2em;
+	background-color: #0084ff;
+	color: #fff;
+	border: .2em solid transparent;
+	padding: .5em;
+}
+
+footer> input:hover {
+	background-color: #fff;
+	color: #0084ff;
+	border-color: #0084ff;
+}
+
+.critical {
+	display: flex;
+}
+
+.critical input {
+	flex: 1;
+	text-align: right;
+}
+
+.critical span {
+	padding: .5em;
+}
+
+.layout {
+	display: none;
+}
+
+body:not(.authorized) .form,
+body:not(.authorized) .item li:last-child {
+	display: none;
+}
+
+		</style>
+		<script>
+		
+function onRemove(resource, index, e) {
+	e.stopPropagation();
+	
+	if (confirm("이 설정을 삭제하겠습니까?")) {
+		var critical = top.databases.critical[window.ip];
+		
+		delete critical[resource][index];
+		
+		if (Object.keys(critical[resource]).length === 0) {
+			delete critical[resource];
+			
+			if (Object.keys(critical).length === 0) {
+				delete top.databases.critical[window.ip];
+			}
+		}
+		
+		put();
+	}
+}
+
+function onApply(e) {
+	e.preventDefault();
+	
+	var critical = top.databases.critical[window.ip],
+		eIndex = form.elements["index"],
+		index = eIndex.value,
+		resource;
+	
+	if (!critical) {
+		critical = {};
+		
+		top.databases.critical[window.ip] = critical;
+	}
+	
+	resource = critical[form.elements.resource.value];
+	if (!resource) {
+		resource = {};
+		
+		critical[form.elements.resource.value] = resource;
+	}
+	
+	resource[index] = {
+		limit: form.elements.limit.value,
+	}
+	
+	if (!eIndex.disabled) {
+		resource[index].description= eIndex.options[eIndex.options.selectedIndex].text;
+	}
+	
+	put();
+}
+
+function onClose(e) {
+	if (top.databases.local.isModified) {
+		top.databases.local.isModified = false;
+		
+		opener.location.reload();
+	}
+	
+	top.closeDialog();
+}
+
+function put() {
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+			command: "put",
+			database: "critical",
+			key: window.ip,
+			value: top.databases.critical[window.ip] || null
+		}, function (data) {
+			top.databases.critical = data;
+			
+			top.databases.local.isModified = true;
+			
+			window.location.reload();
+		});
+}
+
+function onSelectResource() {
+	var resource = form.elements.resource.value,
+		selectedIndex = -1;
+	
+	form.elements["index"].length = 0;
+	
+	form.elements["index"].disabled = false;
+	
+	switch(resource) {
+	case "processor":
+		form.elements["index"].appendChild(createOption(0, "N/A"));
+		form.elements["index"].disabled = true;
+		
+		selectedIndex = 0;
+		
+		break;
+	case "memory":
+		var entry = window.snmp["hrStorageEntry"],
+			storage;
+		
+		for (var index in entry) {
+			storage = entry[index];
+			
+			if (storage.hrStorageType === 2) {
+				form.elements["index"].appendChild(createOption(index, "N/A"));
+				form.elements["index"].disabled = true;
+			}
+		}
+		
+		selectedIndex = 0;
+		
+		break;
+	case "storage":
+		var entry = window.snmp["hrStorageEntry"],
+			storage;
+		
+		for (var index in entry) {
+			storage = entry[index];
+			
+			if(storage.hrStorageType === 4) {
+				form.elements["index"].appendChild(createOption(index, storage.hrStorageDescr));
+			}
+		}
+	
+		break;
+	case "throughput":
+		var entry = window.snmp["ifEntry"],
+			throughput;
+		
+		for (var index in entry) {
+			throughput = entry[index];
+			
+			if (throughput.ifSpeed !== 0) {
+				form.elements["index"].appendChild(createOption(index, throughput.ifName, throughput.ifAlias));
+			}
+		}
+	
+		break;
+	}
+	
+	window.form.elements["index"].selectedIndex = selectedIndex;
+	window.form.elements.limit.value = "";
+}
+
+function createOption(value, text, alias) {
+	var option = document.createElement("option");
+	
+	option.value = value;
+	option.text = text;
+	
+	if (alias) {
+		option.title = alias;
+	}
+	
+	return option;
+}
+
+function createItem(resource, index, critical) {
+	var item = window.item.cloneNode(true);
+	
+	item.children[0].textContent = resourceString[resource];
+	item.children[1].textContent = critical.description || "";
+	item.children[2].textContent = critical.limit;
+	item.children[3].onclick = onRemove.bind(undefined, resource, index);
+	
+	item.onclick = onSelectCritical.bind(undefined, resource, index, critical.limit);
+	
+	return item;
+}
+
+function onSelectCritical(resource, index, limit) {
+	window.form.elements.resource.value = resource;
+	
+	onSelectResource();
+	
+	window.form.elements["index"].value = index;
+	window.form.elements.limit.value = limit;
+}
+
+function initialize(ip) {
+	window.opener = this;
+	window.ip = ip;
+
+	window.critical = top.databases.critical[ip];
+
+	form.elements.resource.selectedIndex = -1;
+
+	var list = document.getElementById("list"),
+		df = document.createDocumentFragment(),
+		criticalResource, limit;
+
+	for (var resource in critical) {
+		criticalResource = critical[resource];
+		
+		for (var index in criticalResource) {
+			df.appendChild(createItem(resource, index, criticalResource[index]));
+		}
+	}
+
+	list.appendChild(df);
+
+	document.getElementById("name").textContent = top.databases.device[top.getDeviceID(ip)].name;
+	document.getElementById("ip").textContent = ip;
+	
+	top.sendRequest({
+		command: "select",
+		ip: ip
+	}, function (response) {
+		window.snmp = response;
+		
+		document.body.classList.remove("loading");
+	});
+
+}
+
+		</script>
+	</head>
+	
+	<body class="loading">
+		
+		<form autocomplete="off" class="dialog dialog_width rounded">
+			<h2>
+				<span id="ip">IP주소</span>
+				임계 설정
+			</h2>
+			<h3 id="name">이름</h3>
+			
+			<section>
+				<header>
+					<ul class="item">
+						<li class="resource">성능지표
+						<li class="index">구분
+						<li class="limit">임계값(%)
+						<li title="삭제">
+					</ul>
+				</header>
+			
+				<div id="list"></div>
+				
+				<div class="form">
+					<ul>
+						<li>성능 지표
+						<li>
+							<select name="resource" required>
+								<option value="processor">Processor load
+								<option value="memory">Physical memory
+								<option value="storage">Storage usage
+								<option value="throughput">Interface throughput
+							</select>
+					</ul>
+					<ul>
+						<li>구분
+						<li>
+							<select name="index" required></select>
+					</ul>
+					<ul>
+						<li>임계값(%)
+						<li class="critical">
+							<input name="limit" type="number" min="1" max="100" required>
+					</ul>
+				</div>
+			</section>
+			<footer>
+				<input type="reset" value="close">
+				<input type="submit" value="apply" disabled>
+			</footer>
+		</form>
+		
+		<div class="bg_loading"></div>
+		
+		<script>
+
+var resourceString = {
+		"processor": "Processor load",
+		"memory": "Physical memory",
+		"storage": "Storage usage",
+		"throughput": "Interface throughput"
+	};
+
+var form = document.querySelector("form"),
+	item = document.querySelector(".item");
+
+form.addEventListener("reset", onClose);
+
+if (top.databases.local.level == 0) {
+	document.body.classList.add("authorized");
+	
+	form.elements["resource"].onchange = onSelectResource;
+	
+	form.onsubmit = onApply;
+
+	document.querySelector("input[type=submit]").disabled = false;
+}
+
+		</script>
+	
+	</body>
+	
+</html>

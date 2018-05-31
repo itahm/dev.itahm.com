@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="Cache-Control" content="No-Cache">
+		
+		<title>Setting @ ITAhM</title>
+		
+		<style>
+@import "css/itahm.css";
+
+body {
+	padding: 10px;
+	margin: 0 auto;
+}
+
+h2 {
+	color: #fff;
+	font-size: 20px;
+	text-shadow: 1px 1px 1px #000;
+}
+
+ul {
+	list-style: none;
+}
+
+.item {
+	display: flex;
+	align-items: center;
+}
+
+.item span {
+	margin-left: 10px;
+	padding: .5em 1em;
+	border: 1px solid transparent;
+}
+
+.item span:hover {
+	cursor: pointer;
+	text-decoration: underline;
+	border-radius: 1em;
+	background-color: #0084ff;
+	color: #fff;
+}
+
+.layout {
+	display: none;
+}
+
+#dashboard {
+	position: relative;
+}
+
+#dashboard> input[type=submit] {
+	position: absolute; top: 50%; left: 200px;
+}
+
+.list {
+	max-height: 100px;
+	overflow: auto;
+	padding: 1em;
+	border: 1px solid #ddd;
+	background-color: #fdfdfd;
+}
+
+.box {
+	padding: 1em;
+	background-color: #fdfdfd;
+	box-shadow: 0 8px 10px -4px #000;
+}
+
+#resources li {
+	overflow: hidden;
+}
+
+#resources li:not(:first-child):hover::after {
+	content: "";
+	border: .5em solid transparent;
+	border-bottom-color: #0084ff;
+	display: inline-block;
+	
+}
+
+#resources li:not(:first-child):hover {
+	cursor: default;
+}
+
+input[type=checkbox] {
+	vertical-align: middle;
+}
+
+form input,
+form select {
+	padding: 3px;
+}
+
+input[name="clean"] {
+	width: 50px;
+	text-align: right;
+}
+
+.common> li {
+	margin: .5em 0;
+}
+
+#path:not(:empty)::before {
+	content: "(";
+}
+
+#path:not(:empty)::after {
+	content: ")";
+}
+
+		</style>
+		<script>
+		
+function initAccount() {
+	var list = document.getElementById("account_list"),
+		accountData = top.databases.account,
+		df = document.createDocumentFragment();
+	
+	for (var username in accountData) {
+		df.appendChild(createItem(accountData[username].level === 0? "img/svg/root.svg": "img/svg/user.svg", username, onSelectAccount));
+	}
+	
+	list.appendChild(df);
+}
+
+function initProfile() {
+	var list = document.getElementById("profile_list"),
+		profileData = top.databases.profile,
+		df = document.createDocumentFragment();
+	
+	for (var name in profileData) {
+		df.appendChild(createItem("img/svg/list.svg", name, onSelectProfile));
+	}
+	
+	list.appendChild(df);
+}
+
+function initSMS() {
+	var list = document.getElementById("sms_list"),
+		smsData = top.databases.sms,
+		df = document.createDocumentFragment();
+	
+	for (var id in smsData) {
+		df.appendChild(createItem("img/sms_list.png", id, onSelectSMS));
+	}
+	
+	list.appendChild(df);
+}
+
+function onSelectAccount(username) {
+	top.showDialog.call(window, "account_dialog.html", username);
+}
+
+function onSelectProfile(name) {
+	top.showDialog.call(window, "profile_dialog.html", name);
+}
+
+function onSelectGCM(id) {
+	top.showDialog.call(window, "gcm_dialog.html", id);
+}
+
+function createItem(src, key, func) {
+	var clone = window.listItem.cloneNode(true);
+	
+	clone.children[0].src = src;
+	clone.children[1].textContent = key;
+	clone.children[1].onclick = func.bind(undefined, key);
+	
+	return clone;
+}
+
+function initConfig() {
+	var configData = top.databases.config;
+	
+	document.querySelector("input[name=clean]").value = configData.clean;
+	document.querySelector("select[name=interval]").value = configData.interval || 1;
+	document.querySelector("input[name=top]").value = configData.top || 10;
+	document.querySelector("select[name=display]").value = configData.display || "name";
+	document.getElementById("java").textContent = configData.java;
+	document.getElementById("version").textContent = configData.version;
+	
+	if (load in configData) {
+		document.getElementById("load").textContent = (function (load) {
+			//TODO 시간순으로 제공해야함. 수정할것.
+			return Object.values(load).join(", ");
+		})(configData.load);
+	}
+	
+	document.getElementById("resource").textContent = configData.resource || 0;
+	document.getElementById("usage").textContent = configData.usage? ITAhM.util.toBytesString(configData.usage): 0;
+	document.getElementById("space").textContent = ITAhM.util.toBytesString(configData.space);
+	
+	if ("path" in configData) {
+		document.getElementById("path").textContent = configData.path;
+	}
+	
+	if ("expire" in configData && configData.expire > 0) {
+		document.getElementById("expire").textContent = new Date(configData.expire).toLocaleString();
+	}
+	
+	if ("custom" in configData) {
+		window.custom.elements["custom"].value = configData.custom.split(",").join(", ") || "";
+	}
+	
+	if ("iftype" in configData) {
+		window.iftype.elements["iftype"].value = configData.iftype.split(",").join(", ") || "";
+	}
+	
+	if ("dashboard" in configData) {
+		var resources = configData.dashboard,
+			orders = [].sort.call(Object.keys(resources), function (a, b) {
+				return parseInt(b) - parseInt(a);
+			}), resource;
+		
+		for (var i=0, _i=orders.length; i<_i; i++) {
+			resource = resources[orders[i]];
+			
+			window.resources.insertBefore(window.resources.querySelector("li[data-value="+ resource +"]")
+				, window.resources.firstElementChild);
+			
+			window.resources.querySelector("input[name="+ resource +"]").checked = true;
+		}
+	}
+	else {
+		[].forEach.call(window.resources.querySelectorAll("input[type=checkbox]"), function (resource) {
+			resource.checked = true;
+		});
+	}
+}
+
+function initCritical() {
+	const critical = document.getElementById("critical");
+	
+	critical.elements["all"].onclick = function () {
+		const ip = critical.elements["ip"];
+
+		ip.value = "";
+		
+		if (this.checked) {
+			ip.disabled = true;
+		}
+		else {
+			ip.disabled = false;
+			ip.focus();
+		}
+	};
+	
+	critical.onsubmit = function (e) {
+		e.preventDefault();
+		
+		const monitorData = top.databases.monitor,
+			overwrite = this.elements["overwrite"].checked;
+		
+		if (overwrite) {
+			if (!confirm("기존 설정을 덮어쓰기 하겠습니까?")) {
+				return;
+			}
+		}
+		
+		var target;
+		
+		if (!this.elements["all"].checked) {
+			const ip = critical.elements["ip"];
+			
+			target = ip.value;
+			
+			if (!target) {
+				return ip.focus();
+			}
+			
+			if (!(target in monitorData && monitorData[target].protocol === "snmp")) {
+				alert("존재하지 않는 모니터링 대상 IP 입니다.");
+				
+				return ip.select();
+			}
+		}
+		
+		document.body.classList.add("loading");
+		
+		top.postRequest({
+			command: "extra",
+			extra: "critical",
+			target: target,
+			resource: this.elements["resource"].value || undefined,
+			rate: this.elements["rate"].value,
+			overwrite: overwrite
+		}, function () {
+			switch(this.status) {
+			case 200:
+				alert("임계를 설정 하였습니다.\n"+
+					"서버와 동기화 하기 위해 재시작 합니다.");
+				
+				top.location.reload();
+				
+				break;
+			case 400:
+				alert("현재 버전에서 지원하지 않는 설정입니다.");
+				
+				break;
+			default:
+				return top.notice(this.status);
+			}
+			
+			document.body.classList.remove("loading");
+		});
+	};
+}
+
+function onSetStorage(clean) {	
+	var clean = parseInt(clean.value);
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "clean",
+		value: clean
+	}, function (response) {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.clean = clean;
+		
+		alert("데이터 보관 기간을 설정하였습니다.");
+	});
+}
+
+function onSetInterval(interval) {	
+	interval = parseInt(interval.value);
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "interval",
+		value: interval
+	}, function (response) {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.interval = interval;
+		
+		alert("데이터 수집 단위를 "+ interval +"분으로 설정하였습니다.");
+	});
+}
+
+function onOrderResources(e) {
+	var li = e.target, ul;
+	
+	if (li.nodeName.toLowerCase() !== "li" || !li.previousElementSibling) {
+		return;
+	}
+	
+	li.parentNode.insertBefore(li, li.previousElementSibling);
+}
+
+function onModifyDashboard(e) {
+	e.preventDefault();
+	
+	var elements = window.resources.children,
+		li
+		resources = {};
+	
+	for (var i=0, _i=elements.length; i<_i; i++) {
+		li = elements[i];
+		
+		if (li.querySelector("input:checked")) {
+			resources[i.toString()] = elements[i].dataset.value;
+		}
+	}
+	
+	if (Object.keys(resources).length == 0 && !confirm("선택한 리소스가 없습니다.\n대시보드에 리소스 정보를 표시하지 않겠습니까?")) {
+		return;
+	}
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "dashboard",
+		value: resources
+	}, function (response) {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.dashboard = resources;
+		
+		alert("대시보드 리소스 정보를 변경하였습니다.");
+	});
+}
+
+function onModifyTopN (n) {
+	n = Math.max(n, 1);
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "top",
+		value: n
+	}, function (response) {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.top = n;
+		
+		alert("대시보드 Top N을 "+n+" 으로 변경하였습니다.");
+	});
+}
+
+function onModifyDisplay(display) {
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "display",
+		value: display.value
+	}, function (response) {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.display = display.value;
+		
+		alert("장비 표시 방식을 변경하였습니다.");
+	});
+}
+
+function onSelectSMS(id) {
+	top.showDialog.call(window, "sms_dialog.html", id);
+}
+
+function onModifyGCM(host) {
+	if (document.body.classList.contains("gcm")) {
+		onSelectGCM();
+	}
+	else {
+		if (host.value === "") {
+			return host.focus();
+		}
+		
+		document.body.classList.add("loading");
+		
+		top.sendRequest({
+			command: "config",
+			key: "gcm",
+			value: host.value
+		}, function (response) {
+			document.body.classList.remove("loading");
+			
+			top.databases.config.gcm = host.value;
+		
+			document.body.classList.add("gcm");
+			
+			alert("구글 클라우드 메세징 서비스를 사용하도록 설정하였습니다.");
+		});
+	}
+}
+
+function onDisableGCM(e) {
+	e.preventDefault();
+	
+	if (confirm("구글 클라우드 메세징 서비스를 사용하지 않도록 설정합니다.")) {
+		document.body.classList.add("loading");
+		
+		top.sendRequest({
+			command: "config",
+			key: "gcm",
+			value: null
+		}, function (response) {
+			document.body.classList.remove("loading");
+			
+			top.databases.config.gcm = null;
+		
+			document.body.classList.remove("gcm");
+		});
+	}
+}
+
+function onEnableSMS(e) {
+	var checked = this.checked;
+	
+	if (confirm("SMS 발송 기능을 "+
+		(checked? "사용 하도록": "사용하지 않도록") +
+		"설정하겠습니까?")) {
+		document.body.classList.add("loading");
+		
+		top.sendRequest({
+			command: "config",
+			key: "sms",
+			value: checked
+		}, function (response) {
+			document.body.classList.remove("loading");
+			
+			top.databases.config.sms = checked;
+		
+			window.location.reload();
+		});
+	}
+	else {
+		e.preventDefault();
+	}
+}
+
+function onMenuFix(e) {
+	e.preventDefault();
+	
+	var menu = this.elements["menu"].value === "fix"? true: false;
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "menu",
+		value: menu
+	}, function () {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.menu = menu;
+	
+		top.setMenu(menu);
+	});
+}
+
+function onEditCustom(e) {
+	e.preventDefault();
+	
+	var customs = this.elements["custom"].value.split(","),
+		custom;
+	
+	for (var i=0, _i=customs.length; i<_i; i++) {
+		customs[i] = customs[i].trim();
+	}
+	
+	custom = customs.join(",");
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "config",
+		key: "custom",
+		value: custom
+	}, function () {
+		document.body.classList.remove("loading");
+		
+		top.databases.config.custom = custom;
+	
+		window.custom.elements["custom"].value = customs.join(", ");
+		
+		alert("장비 정보의 관리 항목을 설정 하였습니다.");
+	});
+}
+
+function onEditIftype(e) {
+	e.preventDefault();
+	
+	var iftypes = [];
+	
+	for (let arr = this.elements["iftype"].value.split(","), i=0, _i=arr.length, n; i<_i; i++) {
+		n = arr[i].trim();
+		
+		if (!isNaN(n)) {
+			iftypes[iftypes.length] = n;
+		}
+	}
+	
+	document.body.classList.add("loading");
+	
+	top.postRequest({
+		command: "config",
+		key: "iftype",
+		value: iftypes.join(",")
+	}, function () {		
+		switch(this.status) {
+		case 200:
+			top.databases.config.iftype = iftypes.join(",");
+		
+			window.iftype.elements["iftype"].value = iftypes.join(", ");
+			
+			alert("인터페이스 성능 수집 대상을 설정 하였습니다.");
+			
+			break;
+		case 400:
+			alert("현재 버전에서 지원하지 않는 설정입니다.");
+			
+			break;
+		default:
+			return top.notice(this.status);
+		}
+		
+		document.body.classList.remove("loading");
+	});
+}
+
+function onBackup(e) {
+	e.preventDefault();
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "extra",
+		extra: "backup"
+	}, function (backup) {
+		document.body.classList.remove("loading");
+		
+		ITAhM.util.download(new Blob([JSON.stringify(backup)],
+			{ type: "text/json;charset=utf-8;"}), (function (d){
+				const a = ["backup_", d.getFullYear()];
+				let n = d.getMonth() +1;
+			
+			a[a.length] = n > 9? n: ("0"+ n);
+			
+			n = d.getDate();
+			
+			a[a.length] = n > 9? n: ("0"+ n);
+			
+			return a.join("");
+		})(new Date()));
+	});
+}
+
+function onRestore(e) {
+	var file = e.target.files[0],
+		reader = new FileReader();
+	
+	reader.onload = function () {
+		document.body.classList.add("loading");
+		
+		top.sendRequest({
+			command: "extra",
+			extra: "restore",
+			backup: JSON.parse(this.result)
+		}, function () {
+			document.body.classList.remove("loading");
+			
+			alert("복구가 완료되었습니다.");
+			
+			top.reload();
+		});
+	};
+	
+	reader.onerror = function () {
+		alert("백업 파일을 읽어올 수 없습니다.")
+	};
+	
+	reader.readAsText(file);
+}
+
+function onTest(e) {
+	e.preventDefault();
+	
+	document.body.classList.add("loading");
+	
+	top.sendRequest({
+		command: "extra",
+		extra: "test"
+	}, function (data) {
+		document.body.classList.remove("loading");
+		
+		var rows = ["ip, sysObjectID, hrProcessorEntry, hrStorageEntry, ifEntry"], row;
+		
+		for (var ip in data) {
+			row = data[ip];
+			
+			rows[rows.length] = 
+				[ip, row.sysObjectID, row.hrProcessorEntry, row.hrStorageEntry, row.ifEntry].join(',');
+		}
+		
+		ITAhM.util.download(new Blob([rows.join("\n")] ,{
+			type: "text/csv;charset=utf-8;"
+		}), "test.csv");
+	});
+}
+
+function initialize() {
+	var configData = top.databases.config;
+	
+	initConfig();
+	initCritical();
+	initAccount();
+	initProfile();
+	initSMS();
+	
+	(function (form) {
+		form.onsubmit = function (e) {
+			e.preventDefault();
+			
+			document.body.classList.add("loading");
+			
+			top.postRequest({
+				command: "config",
+				key: "requestTimer",
+				value: this.elements["timer"].value
+			}, function () {
+				switch(this.status) {
+				case 200:
+					alert("SNMP 요청주기를 설정 하였습니다.");
+					
+					break;
+				case 400:
+					alert("현재 버전에서 지원하지 않는 설정입니다.");
+					
+					break;
+				default:
+					return top.notice(this.status);
+				}
+				
+				document.body.classList.remove("loading");
+			});	
+		};
+	
+		form.elements["timer"].value = configData.requestTimer || "10000";
+	}) (document.getElementById("request"));
+	
+	if (top.databases.config.gcm !== undefined && top.databases.config.gcm !== null) {
+		document.body.classList.add("gcm");
+	}
+	
+	window.menu.elements["menu"].value = top.databases.config.menu? "fix": "auto";
+	
+	window.sms.elements["enable"].checked = top.databases.config.sms? true: false;
+	
+	document.body.classList.remove("loading");
+	
+}
+
+		</script>
+	</head>
+	
+	<body class="loading content_width">
+		<h2>정보</h2>
+		<ul class="common box">
+			<li>자바 버전 : <span id="java"></span>
+			<li>에이전트 버전 : <span id="version"></span>
+			<li>
+				에이전트 저장공간 여유 :
+				<span id="space"></span>
+				<i id="path"></i>
+			<li>데이터베이스 로드 : <span id="load">N/A</span>
+			<li>관리 리소스 갯수 : <span id="resource"></span>
+			<li>전일 디스크 사용량 : <span id="usage"></span>
+			<li>라이센스 만료일 : <span id="expire">N/A</span>
+		</ul>
+		<h2>일반</h2>
+		<ul class="common box">
+			<li>
+				<form id="request">
+					SNMP 요청 주기(초) :
+					<select name="timer">
+						<option value="10000">10
+						<option value="30000">30
+						<option value="60000">60
+					</select>
+					<input type="submit" value="적용" class="root">
+				</form>
+			<li>
+				<form id="clean">
+					데이터 보관 기간(일) :
+					<input type="number" min="0" max="365" name="clean">
+					<input type="submit" value="적용" class="root">
+					<i>(데이터 정리 기능을 사용하지 않는 경우 0)</i>
+				</form>
+			<li>
+				<form id="interval">
+					데이터 저장 단위(분) :
+					<select name="interval">
+						<option value="1">1
+						<option value="5">5
+					</select>
+					<input type="submit" value="적용" class="root">
+				</form>
+			<li>
+				<form id="display">
+					표시 : 
+					<select name="display">
+						<option value="name" selected>장비명
+						<option value="address">IP 주소
+					</select>
+					<input type="submit" value="적용" class="root">
+				</form>
+			<li>
+				<form id="top">
+					Top N : 
+					<input type="number" min="1" name="top">
+					<input type="submit" value="적용" class="root">
+				</form>	
+			<li>
+				<form id="menu">
+					<label>
+						메뉴 고정 : 
+						<select name="menu">
+							<option value="auto">자동
+							<option value="fix">고정
+						</select>
+						<input type="submit" value="적용" class="root">
+					</label>
+				</form>
+			<li>
+				<form id="custom">
+					장비정보 항목 관리 : 
+					<input type="text" name="custom" placeholder="항목1 [,항목2 ...]">
+					<input type="submit" value="적용" class="root">
+					<i>콤마(,)로 구분</i>
+				</form>
+			<li>
+				<form id="iftype">
+					인터페이스 종류 : 
+					<input type="text" name="iftype" placeholder="종류1 [,종류2 ...]">
+					<input type="submit" value="적용" class="root">
+					<i>콤마(,)로 구분</i>
+				</form>
+			<li>
+				<form id="backup">
+					설정 복구 : 
+					<input type="file" name="restore" value="복구" class="root">
+					<input type="submit" value="백업" class="root">
+				</form>
+		</ul>
+	
+		<h2>대시보드</h2>
+		<form id="dashboard" class="box">
+			<ol id="resources">
+				<li data-value="responseTime">
+					<input type="checkbox" name="responseTime">
+					응답속도
+				<li data-value="processor">
+					<input type="checkbox" name="processor">
+					프로세서 로드
+				<li data-value="memory">
+					<input type="checkbox" name="memory">
+					메모리 사용량
+				<li data-value="memoryRate">
+					<input type="checkbox" name="memoryRate">
+					메모리 사용율
+				<li data-value="storage">
+					<input type="checkbox" name="storage">
+					스토리지 사용량
+				<li data-value="storageRate">
+					<input type="checkbox" name="storageRate">
+					스토리지 사용율
+				<li data-value="throughput">
+					<input type="checkbox" name="throughput">
+					통신 사용량
+				<li data-value="throughputRate">
+					<input type="checkbox" name="throughputRate">
+					통신 사용율
+				<li data-value="throughputErr">
+					<input type="checkbox" name="throughputErr">
+					통신 오류
+				<li data-value="failureRate">
+					<input type="checkbox" name="failureRate">
+					snmp 오류
+			</ol>
+			<input type="submit" value="적용" class="root">
+		</form>
+		
+		<form id="critical">
+			<h2>임계 설정</h2>
+			<div class="box">
+				<p>
+					적용 노드 :
+					<input type="text" name="ip">
+					<label><input type="checkbox" name="all">모두</label>
+				</p>
+				<p>
+					성능 지표 :
+					<select name="resource" required>
+						<option value="processor">프로세서 로드</option>
+						<option value="memory">메모리</option>
+						<option value="storage">스토리지</option>
+						<option value="throughput">통신</option>
+						<optgroup>
+							<option value="" selected>모두</option>
+						</optgroup>
+						
+					</select>
+				</p>
+				<p>
+					임계값(%) : <input type="number" min="0" max="100" name="rate" required>
+				</p>
+				<p>
+					<label><input type="checkbox" name="overwrite">기존 설정 덮어쓰기</label>
+					<input type="submit" value="실행"><i>서버와 동기화 하기 위해 실행 후 Console을 재시작 합니다.</i>
+				</p>
+			</div>
+		</form>
+		
+		<form id="account">
+			<h2>계정 <input type="button" value="추가" title="계정 추가" class="root"></h2>
+			<div class="box">
+				<ul id="account_list" class="list"></ul>
+			</div>
+		</form>
+		
+		<form id="profile">
+			<h2>프로파일 <input type="button" value="추가" title="프로파일 추가" class="root"></h2>
+			<div class="box">
+				<ul id="profile_list" class="list"></ul>
+				<i>등록된 Profile은 변경할 수 없습니다. 삭제후 추가하십시오. (사용중인 Profile은 삭제할 수 없습니다.)</i>
+			</div>
+		</form>
+		
+		<form id="sms">
+			<h2>
+				<input type="checkbox" name="enable" class="root">
+				SMS
+				<input type="button" value="추가" title="알림 추가" class="root">
+			</h2>
+			<div class="box">
+				<ul id="sms_list" class="list"></ul>
+			</div>
+		</form>
+		
+		
+		<form id="test">
+			<h2> </h2>
+			<div class="box">
+				<input type="submit" value="테스트">
+			</div>
+		</form>	
+		
+		<div class="bg_loading"></div>
+		
+		<div class="layout">
+			<ul>
+				<li class="item">
+					<img width="20" height="20">
+					<span></span>
+			</ul>
+		</div>
+		
+		<script src="js/ITAhM.js"></script>
+		<script src="js/object.js"></script>
+		<script>
+
+var resources = document.getElementById("resources"),
+	sms = document.getElementById("sms"),
+	listItem = document.querySelector(".item"),
+	menu = document.getElementById("menu"),
+	custom = document.getElementById("custom"),
+	iftype = document.getElementById("iftype"),
+	backup = document.getElementById("backup");
+
+if (top.databases.local.level > 0) {
+	[].forEach.call(document.querySelectorAll(".root"),
+		function (e) {
+			e.disabled = true;
+		});
+}
+
+document.getElementById("account").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onSelectAccount();
+};
+
+document.getElementById("profile").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onSelectProfile();
+};
+
+document.getElementById("profile").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onSelectProfile();
+};
+
+document.getElementById("clean").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onSetStorage(this.elements["clean"]);	
+};
+
+document.getElementById("interval").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onSetInterval(this.elements["interval"]);	
+};
+
+window.sms.onsubmit = function (e) {
+	e.preventDefault();
+	
+	onSelectSMS();
+};
+
+document.getElementById("display").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onModifyDisplay(this.elements["display"]);
+};
+
+document.getElementById("top").onsubmit = function (e) {
+	e.preventDefault();
+	
+	onModifyTopN(this.elements["top"].value);
+};
+
+backup.onsubmit = onBackup;
+backup.elements["restore"].onchange = onRestore;
+document.getElementById("dashboard").onsubmit = onModifyDashboard;
+document.getElementById("test").onsubmit = onTest;
+window.sms.elements["enable"].onclick = onEnableSMS;
+custom.onsubmit = onEditCustom;
+iftype.onsubmit = onEditIftype;
+menu.onsubmit = onMenuFix;
+window.resources.onclick = onOrderResources;
+
+initialize();
+
+		</script>
+	
+	</body>
+	
+</html>
