@@ -104,7 +104,8 @@ body:not(.redirected) {
 		switch(parseInt(version.split(major)[1])) {
 		case 2:
 		case 3:
-			window.location.href = "2.0.3.2/group_dialog.html";
+			window.location.href = "/2.0.3.2/group_dialog.html";
+
 			break;
 		}
 	}
@@ -178,8 +179,8 @@ function onApply(e) {
 		key: group.id,
 		value: group
 	}, function () {
-		top.databases.device[group.id] = group;
-		
+		top.putDB("device", group.id, group);
+
 		window.opener.reload();
 		
 		top.closeDialog();
@@ -208,7 +209,7 @@ function onRemoveGroup() {
 				var posData = top.databases.position;
 				
 				// group 정보 삭제
-				delete top.databases.device[window.group.id];
+				top.putDB("device", window.group.id);
 				
 				// 연관 link 정보 삭제
 				for (let id in posData[window.group.id].ifEntry) {
@@ -244,19 +245,16 @@ function onRemoveGroup() {
 }
 
 function createID() {
-	var devData = top.databases.device,
-		max = 0,
+	var max = 0,
 		group;
 	
-	for (var id in devData) {
-		group = devData[id];
-		
+	top.forEachDB("device", function (id, group) {
 		if (!group.group || group.id.indexOf(GROUP_TAG) === -1) {
-			continue;
+			return;
 		}
 		
 		max = Math.max(parseInt(group.id.split(GROUP_TAG)[1]), max);
-	}
+	});
 	
 	return ++max;
 }
@@ -265,7 +263,7 @@ function initialize(id) {
 	window.opener = this && this.location;
 	
 	if (id) {
-		window.group = top.databases.device[id];
+		window.group = top.getDB("device", id);
 		
 		form.elements.name.value = window.group.name;
 		form.elements.type.value = window.group.type;

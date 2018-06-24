@@ -24,7 +24,11 @@ function Draggable(target) {
 			
 		if (!isDragging) {
 			data = {
-				target: draggable
+				target: draggable,
+				ctrlKey: e.ctrlKey,
+				shiftKey: e.shiftKey,
+				x: originX,
+				y: originY
 			};
 			
 			target.dispatchEvent(createEvent("dragon", data));

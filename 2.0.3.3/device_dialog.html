@@ -179,14 +179,25 @@ function onSearch() {
 function onApply(e) {
 	e.preventDefault();
 	
-	const device = window.id? top.databases.device[id]: {
+	const ip = this.elements["ip"].value,
+		device = window.id? top.getDB("device", window.id) : {
 			ifSpeed: {}
 		};
+
+	if (ip) {
+		if (!isIPv4(ip)) {
+			return this.elements["ip"].select();
+		}
+
+		if (device.ip !== ip && top.getDeviceID(ip)) {
+			return alert("사용중인 IP 입니다.");
+		}
+	}
 	
-	device.ip = window.form.elements["ip"].value;
-	device.name = window.form.elements["name"].value;
-	device.type = window.form.elements["type"].value;
-	device.label = trimLabel(window.form.elements["label"].value);
+	device.ip = ip;
+	device.name = this.elements["name"].value;
+	device.type = this.elements["type"].value;
+	device.label = trimLabel(this.elements["label"].value);
 	
 	for (var custom in window.custom) {
 		device[custom] = window.custom[custom].value;
@@ -229,11 +240,9 @@ function onApply(e) {
 }
 
 function saveDevice(id, device) {
-	top.databases.device[id] = device;
+	top.putDB("device", window.id, device);
 	
-	if (window.opener) {
-		window.opener.reload();
-	}
+	window.opener && window.opener.reload();
 	
 	top.closeDialog();
 }
@@ -262,7 +271,7 @@ function onRemoveDevice() {
 			const posData = top.databases.position;
 			
 			// device 정보 삭제
-			delete top.databases.device[window.id];
+			top.putDB("device", window.id);
 			
 			// device의 monitor 정보 삭제
 			delete top.databases.monitor[window.id];
@@ -284,7 +293,7 @@ function onRemoveDevice() {
 			
 			document.body.classList.remove("loading");
 			
-			window.opener.reload();
+			window.opener && window.opener.reload();
 			
 			top.closeDialog();
 		});
@@ -295,7 +304,7 @@ function onRemoveDevice() {
 }
 
 function onMonitorDevice(e) {
-	const device = top.databases.device[window.id];
+	const device = top.getDB("device", window.id);;
 	
 	if (device.ip != window.form.elements["ip"].value) {
 		return alert("IP를 변경한 경우 먼저 저장 하십시오.");
@@ -317,9 +326,7 @@ function onMonitorDevice(e) {
 			}, function (data) {
 				top.databases.monitor = data;
 				
-				if (window.opener) {
-					window.opener.reload();
-				}
+				window.opener && window.opener.reload();
 				
 				top.closeDialog();
 			});
@@ -374,7 +381,7 @@ function initialize(id) {
 	}
 	
 	if (id) {
-		const device = top.databases.device[id];
+		const device = top.getDB("device", window.id);
 		
 		window.form.elements["name"].value = device.name || "";
 		

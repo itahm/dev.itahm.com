@@ -670,8 +670,7 @@ function update() {
 }
 
 function initStats() {
-	var deviceData = top.databases.device,
-		monitorData = top.databases.monitor,
+	var monitorData = top.databases.monitor,
 		df = document.createDocumentFragment(),
 		monitor,
 		shutdown = 0,
@@ -684,12 +683,11 @@ function initStats() {
 		window.summaryList.removeChild(window.summaryList.firstChild);
 	}
 	
-	for (var id in deviceData) {
-		device = deviceData[id];
+	top.forEachDB("device", function (id, device) {
 		monitor = device.ip && monitorData[device.ip];
 	
 		if (!monitor) {
-			continue;
+			return;
 		}
 		
 		if (device.label) {
@@ -725,7 +723,7 @@ function initStats() {
 		else {
 			normal++;
 		}		
-	}
+	});
 	
 	window.alert.dataset.value = shutdown;
 	window.critical.dataset.value = critical;
@@ -856,7 +854,7 @@ function createGaugeItem(ip, value, rate, resource, index) {
 	
 	item.className = "list_item";
 	
-	item.appendChild(document.createElement("li")).textContent = top.databases.device[id].name;
+	item.appendChild(document.createElement("li")).textContent = top.getDB("device", id).name;
 	item.appendChild(document.createElement("li")).textContent = ip;
 	
 	bar = item.appendChild(document.createElement("li"));
@@ -884,7 +882,7 @@ function createTopItem(ip, value) {
 	
 	item.className = "list_item";
 	
-	item.appendChild(document.createElement("li")).textContent = top.databases.device[ip].name;
+	item.appendChild(document.createElement("li")).textContent = top.getDB("device", ip).name;
 	item.appendChild(document.createElement("li")).textContent = ip;
 	
 	bar = item.appendChild(document.createElement("li"));
@@ -952,7 +950,7 @@ function resetEvent() {
 		
 		for (var i=0, log, device; i<count; i++) {
 			log = data[indexArray[i]];
-			device = top.databases.device[log.ip];
+			device = top.getDB("device", log.ip);
 		
 			df.appendChild(createItem((device && device.name) || log.ip, log.date, log.message, log.status, log.type));
 		}
@@ -1248,20 +1246,20 @@ if ("display" in top.databases.config) {
 	}
 		
 	function moveAllDevice(x, y) {
-		var group = top.databases.local.parent, moved;
+		var group = top.databases.local.parent, moved, pos;
 		
-		for (var id in top.databases.device) {
+		top.forEachDB("device", function (id, device) {
 			pos = top.databases.position[id];
 			
 			if (pos.parent !== group) {
-				continue;
+				return;
 			}
 			
 			moved = moveDevice(id, x, y);
 			
 			pos.x = moved.x;
 			pos.y = moved.y;
-		}
+		});
 	}
 
 	function drawLine(x, y, data, direct) {
@@ -1301,7 +1299,7 @@ if ("display" in top.databases.config) {
 	}
 
 	function addDevice(id, pos) {
-		var device = top.databases.device[id],
+		var device = top.getDB("device", id),
 			svgDevice = document.createElementNS(svgNS, "g"),
 			svgIcon = document.createElementNS(svgNS, "image"),
 			svgBG = document.createElementNS(svgNS, "circle"),
@@ -1348,7 +1346,7 @@ if ("display" in top.databases.config) {
 	}
 
 	function drawDevice(id) {
-		var device = top.databases.device[id],
+		var device = top.getDB("device", id),
 			svgDevice = svgData[id],
 			svgIcon = svgDevice.querySelector("image"),
 			pos = top.databases.position[id],
@@ -1381,7 +1379,7 @@ if ("display" in top.databases.config) {
 	}
 
 	function moveDevice(id, x, y) {
-		var device = top.databases.device[id],
+		var device = top.getDB("device", id),
 			pos = top.databases.position[id],
 			link = linkData[id],
 			data;
@@ -1421,7 +1419,7 @@ if ("display" in top.databases.config) {
 	}
 
 	function addLine(id, pos) {
-		var device = top.databases.device[id],
+		var device = top.getDB("device", id),
 			ifEntry = pos.ifEntry,
 			peerList = {},
 			peerPos, peerIP, link, lineSvg,
@@ -1491,7 +1489,7 @@ if ("display" in top.databases.config) {
 			critical = {},
 			pos;
 		
-		for (var id in top.databases.device) {
+		top.forEachDB("device", function (id, device) {
 			pos = top.databases.position[id];
 
 			// 동기화 안된 node의 pos 정보가 없음
@@ -1518,7 +1516,7 @@ if ("display" in top.databases.config) {
 					critical[pos.parent] = true;
 				}
 			}
-		}
+		});
 		
 		for (var id in shutdown) {
 			setGroupStatus(id, "shutdown");

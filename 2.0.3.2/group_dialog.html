@@ -133,7 +133,7 @@ function buildType() {
 function onApply(e) {
 	e.preventDefault();
 	
-	const group = window.id? top.databases.device[window.id]: {
+	const group = window.id? top.getDB("device", window.id): {
 			group: true
 		},
 		posData = top.databases.position;
@@ -173,7 +173,7 @@ function onApply(e) {
 }
 
 function saveGroup(id, group) {
-	top.databases.device[id] = group;
+	top.putDB("device", id, group);
 	
 	if (window.opener) {
 		window.opener.reload();
@@ -203,7 +203,7 @@ function onRemoveGroup() {
 			var posData = top.databases.position;
 			
 			// group 정보 삭제
-			delete top.databases.device[window.id];
+			top.putDB("device", window.id);
 			
 			// group을 parent로 갖는 device의 pos 정보 갱신
 			for (let id in posData) {
@@ -243,7 +243,7 @@ function initialize(id) {
 	window.id = id;
 	
 	if (id) {
-		const group = top.databases.device[id];
+		const group = top.getDB("device", id);
 		
 		form.elements.name.value = group.name;
 		form.elements.type.value = group.type;

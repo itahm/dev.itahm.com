@@ -46,24 +46,25 @@ text {
 }
 
 #line line {
-	stroke: #a17f1a/*836953*/;
+	stroke: #2f4;
+	stroke: #ffd800;
 	stroke-width: 1;
+}
+
+#line line.animation {
+	stroke: #a17f1a;
+	stroke: #040;
+	stroke: #3d3400;
 	animation: 5s line infinite;
 }
 
 @keyframes line {
 	0% {
-		stroke: #ddd;
-		stroke-width: .5;
+		stroke-dashoffset: 0;
 	}
-	20% {
-		stroke: #a17f1a;
-		stroke-width: 1;
-	}/*
-	100% {
-		stroke: #a17f1a;
-		stroke-width: 1;
-	}*/
+	80%{
+		stroke-dashoffset: 0;
+	}
 }
 
 #line text {
@@ -85,20 +86,7 @@ text {
 #device text {
 	font-size: 12px;
 }
-/*
-use.critical {
-	stroke-width: 5;
-	stroke: rgba(255, 255, 0, .5);
-	fill: none;
-}
 
-use.shutdown {
-	stroke-width: 5;
-	stroke: rgba(255, 0, 0, .5);
-	fill: none;
-	animation: alert 2s infinite;
-}
-*/
 @keyframes initialize {
 	from {
 		transform: rotate(0) scale(.1);
@@ -117,9 +105,7 @@ use.shutdown {
     }
 }
 
-body.loading g,
-#anchor:not(.snmp) #chart_anchor,
-#anchor:not(.snmp) #alarm_anchor {
+body.loading g {
 	display: none;
 }
 
@@ -151,12 +137,7 @@ body.loading g,
 	stroke: #f00; 
 }
 
-.device.hover circle,
-#parent.hover {
-	stroke: #0f0;
-}
-
-#parent {
+.parent {
 	fill: #fff;
 	stroke: #ddd; stroke-width: 5px;
 }
@@ -172,27 +153,27 @@ body.loading g,
 
 body.name tspan:last-child,
 body:not(.name) tspan:first-child,
-body:not(.ifname) #line text,
 body:not(.root) .root,
-body:not(.selected) #anchor,
-body:not(.submap) .parent {
+body:not(.submap) #parent {
 	display: none;
 }
 
 		</style>
 		
 		<script>
-		
+
 function zoom(ratio) {
 	window.scale = ratio;
 	
 	transform.getItem(1).setScale(ratio, ratio);
 }
-	
+
 function resize() {
-	rect = mapCanvas.getBoundingClientRect();
+	const rect = mapCanvas.getBoundingClientRect();
 	
 	transform.getItem(0).setTranslate(rect.width /2, rect.height /2);
+
+	window.parentAnchor.setAttribute("transform", "translate("+ (rect.width -60) +","+ (rect.height -60) +")");
 }
 	
 function moveMap(x, y) {
@@ -206,192 +187,28 @@ function restoreMap() {
 
 	moveMap(0, 0);
 }
-	
+
 function onDragStart(e) {
-	var data = e.detail,
-		target = data.target;
-	
-	if (window.selected) {
-		if (target === linkAnchor) {
-			var pos = top.databases.position[window.selected];
-			
-			window.linkCanvas.appendChild(linkAnchor);
-			window.linkCanvas.appendChild(linkSVG);
-			
-			linkSVG.setAttribute("x1", pos.x);
-			linkSVG.setAttribute("y1", pos.y);
-		}
-	}
-	
-	window.isDragging = true;
-}
-
-function isChecked(svgDevice) {
-	if (!hasClass(svgDevice, "device")) {
-		svgDevice = svgDevice.parentNode;
-	}
-	
-	return hasClass(svgDevice, "device", "checked");
-}
-
-function onEnter(id) {
-	addClass(this, "hover");
-	
-	window.group = id;
-	window.isGroup = true;
-}
-
-function onLeave() {
-	removeClass(this, "hover");
-	
-	window.isGroup = false;
-}
-
-function deleteIFEntry(id) {
-	var pos = top.databases.position[id];
-	
-	for (var peerIP in pos.ifEntry) {
-		delete top.databases.position[peerIP].ifEntry[id];
-	}
-	
-	top.databases.position[id].ifEntry = {};
-	
-	pos.parent = window.group;
-}
-
-function moveGroup() {
-	if (window.selected) {
-		deleteIFEntry(window.selected);
-	}
-	
-	for (id in window.checked) {
-		deleteIFEntry(id);
-	}
-	
-	window.location.reload();
-}
-
-function moveSelectedDevice(x, y) {
-	var pos;
-	
-	if (window.selected) {
-		pos = moveDevice(window.selected, x, y);
-		
-		moveAnchor(pos.x, pos.y);
-	}
-	
-	for (var id in window.checked) {
-		moveDevice(id, x, y);
-	}
-}
-
-function moveSelectedDeviceTo(x, y) {
-	var pos;
-	
-	if (window.selected) {
-		pos = top.databases.position[window.selected];
-		
-		pos.x += x;
-		pos.y += y;
-	}
-	
-	for (var id in window.checked) {
-		pos = top.databases.position[id];
-		
-		pos.x += x;
-		pos.y += y;
-	}
+	isDragging = true;
 }
 
 function onDragMove(e) {
-	var data = e.detail,
-		target = data.target,
-		x = data.dragX / window.scale,
-		y = data.dragY / window.scale;
+	var drag = e.detail;
 	
-	if (isChecked(target)) {
-		var pos;
-		
-		addClass(target, "drag");
-		
-		moveSelectedDevice(x, y);
-	}
-	else if (target === linkAnchor) {
-		var destination = data.destination,
-			pos = top.databases.position[window.selected];
-		
-		linkAnchor.setAttribute("transform", "translate("+ (pos.x + x) +","+ (pos.y + y) +")");
-
-		destination = getDevice(destination);
-		
-		if (destination &&  destination !== window.svgData[window.selected]) {
-			var matrix = destination.transform.baseVal.getItem(0).matrix;
-			
-			x = matrix.e;
-			y = matrix.f;
-			
-			addClass(window.linkCanvas, "match");
-		}
-		else {
-			x += pos.x;
-			y += (pos.y -34);
-			
-			removeClass(window.linkCanvas, "match");
-		}
-		
-		window.linkSVG.setAttribute("x2", x);
-		window.linkSVG.setAttribute("y2", y);
-	}
-	else {
-		moveMap(x, y);
-	}
+	moveMap(drag.dragX / window.scale, drag.dragY / window.scale);
 }
 
 function onDragEnd(e) {
-	var data = e.detail,
-		target = data.target,
-		destination = data.destination,
-		eventData = {},
-		event = ITAhM.util.createCustomEvent("link", eventData);
-	
-	if (isChecked(target)) {
-		var x = Math.round(data.dragX / window.scale /10) *10,
-			y = Math.round(data.dragY / window.scale /10) *10,
-			pos;
-		
-		removeClass(target, "drag");
-		
-		if (window.isGroup) {
-			moveGroup();
-		}
-		else {
-			moveSelectedDeviceTo(x, y);
-		}
-	}
-	else if (target === linkAnchor) {
-		var pos = top.databases.position[window.selected];
-		
-		window.anchor.appendChild(linkAnchor);
-		
-		linkAnchor.setAttribute("transform", "translate(0, 0)");
-		
-		window.fragment.appendChild(linkSVG);
-		
-		destination = getDevice(destination);
-		
-		if (destination &&  destination !== window.svgData[window.selected]) {
-			eventData.peer = window.selected;
-			
-			destination.dispatchEvent(event);
-		}
-	}
-	else {
-		restoreMap();
-	}
+	var matrix = transform.getItem(2).matrix;
+
+	moveAllDevice(matrix.e, matrix.f);
+
+	moveMap(0, 0);
 }
-	
+
 function moveAllDevice(x, y) {
-	var group = top.databases.local.parent, moved, pos;
+	const group = top.databases.local.parent;
+	var pos;
 	
 	top.forEachDB("device", function (id) {
 		pos = top.databases.position[id];
@@ -400,94 +217,48 @@ function moveAllDevice(x, y) {
 			return;
 		}
 		
-		moved = moveDevice(id, x, y);
-		
-		pos.x = moved.x;
-		pos.y = moved.y;
+		pos.x = Math.round((x + pos.x) /10) *10;
+		pos.y = Math.round((y + pos.y) /10) *10;
+	
+		window.svgData[id].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
 	});
-	
-	if (window.selected) {
-		pos = top.databases.position[window.selected];
+
+	const posData = top.getDB("position");
+	var list, link, pos1, pos2;
+
+	for (let id in window.linkData) {
+		list = window.linkData[id];
 		
-		moveAnchor(pos.x, pos.y);
-	}
-}
-	
-function onCancelSelect() {
-	if (window.isDragging) {
-		window.isDragging = false;
-	}
-	else {
-		resetSeleced();
-		resetChecked();
+		for (let peerID in list) {
+			link = list[peerID];
+			
+			pos1 = posData[link.peer1];
+			pos2 = posData[link.peer2];
+
+			link.svg.setAttribute("x1", pos1.x);
+			link.svg.setAttribute("y1", pos1.y);
+			link.svg.setAttribute("x2", pos2.x);
+			link.svg.setAttribute("y2", pos2.y);
+
+			if (link.name) {
+				link.name.setAttribute("x", (pos1.x *2 + pos2.x) /3);
+				link.name.setAttribute("y", (pos1.y *2 + pos2.y) /3);
+			}
+		}
 	}
 }
 
-/**
- * public
- */
-function showSelectedDevice(id) {
-	var svgDevice = window.svgData[id];
-	
-	if (svgDevice) {
-		selectDevice(id, svgDevice);
-	}
-}
-
-function onSelectDevice(id, svgDevice, check) {
-	if (!check) {
-		return selectDevice(id, svgDevice);
-	}
-	
-	if (id === window.selected) {
-		resetSeleced();
-	}
-	else if (id in window.checked) {
-		delete window.checked[id];
-		
-		removeClass(svgDevice, "checked");
-	}
-	else {
-		window.checked[id] = svgDevice;
-		
-		addClass(svgDevice, "checked");
-	}
-}
-
-function selectDevice(id, svgDevice) {
-	var device = top.getDB("device", id),
-		monitor = device.ip && top.databases.monitor[device.ip],
-		pos = top.databases.position[id];
-	
-	if (window.selected) {
-		removeClass(window.svgData[window.selected], "checked");
-	}
-	else {
-		document.body.classList.add("selected");
-	}
-	
-	window.selected = id;
-	
-	resetChecked();
-	
-	addClass(window.deviceCanvas.appendChild(svgDevice), "checked");
-	
-	window.anchor.setAttribute("class", monitor? monitor.protocol: "none");
-	
-	moveAnchor(pos.x, pos.y);
-}
-
-function drawLine(x, y, data, direct) {
-	var svgDevice, pos,
+function _drawLine(x, y, data, direct) {
+	var svgLine, pos,
 		x1, y1, x2, y2;
 
-	svgDevice = data.svg;
+	svgLine = data.svg;
 	
 	if (direct) {
 		pos = top.databases.position[data.peer2];
 		
-		svgDevice.setAttribute("x1", x);
-		svgDevice.setAttribute("y1", y);
+		svgLine.setAttribute("x1", x);
+		svgLine.setAttribute("y1", y);
 		
 		x1 = x;
 		y1 = y;
@@ -497,8 +268,8 @@ function drawLine(x, y, data, direct) {
 	else {
 		pos = top.databases.position[data.peer1];
 		
-		svgDevice.setAttribute("x2", x);
-		svgDevice.setAttribute("y2", y);
+		svgLine.setAttribute("x2", x);
+		svgLine.setAttribute("y2", y);
 		
 		x1 = pos.x;
 		y1 = pos.y;
@@ -506,9 +277,9 @@ function drawLine(x, y, data, direct) {
 		y2 = y;
 	}
 
-	if (data.name1) {
-		data.name1.setAttribute("x", (x1 *2 + x2) /3);
-		data.name1.setAttribute("y", (y1 *2 + y2) /3);
+	if (data.name) {
+		data.name.setAttribute("x", (x1 *2 + x2) /3);
+		data.name.setAttribute("y", (y1 *2 + y2) /3);
 	}
 	
 	if (data.name2) {
@@ -519,6 +290,7 @@ function drawLine(x, y, data, direct) {
 
 function addDevice(id, pos) {
 	var device = top.getDB("device", id),
+		monitor = device.ip && top.databases.monitor[device.ip],
 		svgDevice = document.createElementNS(svgNS, "g"),
 		svgIcon = document.createElementNS(svgNS, "image"),
 		svgBG = document.createElementNS(svgNS, "circle"),
@@ -536,17 +308,22 @@ function addDevice(id, pos) {
 	svgBG.setAttribute("cy", 0);
 	
 	svgDevice.setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
-	svgDevice.onclick = onClickDevice.bind(svgDevice, id);
-	svgDevice.addEventListener("link", onLink.bind(undefined, id));
 	
 	if (device.group) {
-		svgDevice.onmouseenter = onEnter.bind(svgDevice, id);
-		svgDevice.onmouseleave = onLeave.bind(svgDevice);
-		svgDevice.ondblclick = onSelectGroup.bind(svgDevice, id);
+		svgDevice.onclick = function() {
+			top.databases.local.parent = id;
+	
+			window.location.reload();
+		};
+	}
+	else if (monitor && monitor.protocol === "snmp") {
+		svgDevice.onclick = function () {
+			top.showStatus(id);
+		};
 	}
 	
-	svgName.textContent = device.name;
-	svgAddr.textContent = device.ip;
+	svgName.textContent = device.name || device.ip;
+	svgAddr.textContent = device.ip || device.name;
 	
 	svgLabel.appendChild(svgName);
 	svgLabel.appendChild(svgAddr);
@@ -647,9 +424,8 @@ function hasClass(e, className) {
 	return true;
 }
 
-function moveDevice(id, x, y) {
-	var device = top.getDB("device", id),
-		pos = top.databases.position[id],
+function _moveDevice(id, x, y) {
+	var pos = top.databases.position[id],
 		link = window.linkData[id],
 		data;
 
@@ -660,8 +436,8 @@ function moveDevice(id, x, y) {
 	
 	svgDevice.setAttribute("transform", "translate("+ x +","+ y +")");
 	
-	for (var peerIP in link) {
-		data = link[peerIP];
+	for (var peerID in link) {
+		data = link[peerID];
 	
 		drawLine(x, y, data, data.peer1 === id);
 	}
@@ -672,60 +448,87 @@ function moveDevice(id, x, y) {
 	};
 }
 
-function onClickDevice(id, e) {
-	e.stopPropagation();
-	
-	if (window.isDragging) {
-		window.isDragging = false;
-	}
-	else {
-		onSelectDevice(id, this, e.ctrlKey);
-	}
-}
-
-function preventDefault(e) {
-	e.preventDefault();
-}
-
-function moveAnchor(x, y) {
-	window.anchor.setAttribute("transform", "translate("+ (x) +", "+ (y) +")");
-}
-
-function resetSeleced() {
-	document.body.classList.remove("selected");
-	
-	if (window.selected) {
-		removeClass(window.svgData[window.selected], "checked");
-	
-		window.selected = undefined;
-	}
-}
-
-function resetChecked() {
-	for (var id in window.checked) {
-		removeClass(window.checked[id], "checked");
-	}
-	
-	window.checked = {};
-}
-
 function moveLabel(labelSvg, x1, y1, x2, y2) {
 	labelSvg.setAttribute("x", (x1 *2 + x2) /3);
 	labelSvg.setAttribute("y", (y1 *2 + y2) /3);
+}
+
+function setAnimation(lineSvg, length) {
+	setTimeout(function () {
+		lineSvg.style.strokeDashoffset = length;
+
+		addClass(lineSvg, "animation");
+	}, Math.random() *5000);
 }
 
 function addLine(id, pos) {
 	var device = top.getDB("device", id),
 		ifEntry = pos.ifEntry,
 		peerList = {},
-		peerPos, peerIP, link, lineSvg, port, labelSvg;
+		peerPos, peerID, link, lineSvg, port, labelSvg;
 	
 	window.linkData[id] = peerList;
 	
-	for (var peerIP in ifEntry) {
-		peerPos = top.databases.position[peerIP];
+	for (var peerID in ifEntry) {
+		peerPos = top.databases.position[peerID];
 		
-		port = ifEntry[peerIP];
+		port = ifEntry[peerID];
+		
+		if (port) {
+			labelSvg = document.createElementNS(svgNS, "text");
+			
+			labelSvg.textContent = port.name;
+			labelSvg.onclick = function () {
+				top.showStatus(id, "throughput", port.index);
+			}
+			
+			moveLabel(labelSvg, pos.x, pos.y, peerPos.x, peerPos.y);
+		}
+		
+		
+		lineSvg = document.createElementNS(svgNS, "line");
+			
+		lineSvg.setAttribute("x1", pos.x);
+		lineSvg.setAttribute("y1", pos.y);
+		lineSvg.setAttribute("x2", peerPos.x);
+		lineSvg.setAttribute("y2", peerPos.y);
+			
+		link = {
+			peer1: id,
+			name: labelSvg,
+			peer2: peerID,
+			svg: lineCanvas.appendChild(lineSvg)
+		};
+		
+		if (window.linkData[peerID]) {
+			const length = lineSvg.getTotalLength();
+			
+			lineSvg.setAttribute("stroke-dasharray", length +" "+ length);
+			
+			setAnimation(lineSvg, length);
+		}
+		
+		// label이 선보다 위에 그려지도록 나중에 붙여줌
+		if (port) {
+			lineCanvas.appendChild(labelSvg);
+		}
+		
+		peerList[peerID] = link;
+	}
+}
+
+function _addLine(id, pos) {
+	var device = top.getDB("device", id),
+		ifEntry = pos.ifEntry,
+		peerList = {},
+		peerPos, peerID, link, lineSvg, port, labelSvg;
+	
+	window.linkData[id] = peerList;
+	
+	for (var peerID in ifEntry) {
+		peerPos = top.databases.position[peerID];
+		
+		port = ifEntry[peerID];
 		
 		if (port) {
 			labelSvg = document.createElementNS(svgNS, "text");
@@ -739,8 +542,8 @@ function addLine(id, pos) {
 		}
 		
 		// peer가 먼저 svg 만들었다면 공유
-		if (window.linkData[peerIP]) {
-			link = linkData[peerIP][id];
+		if (window.linkData[peerID]) {
+			link = linkData[peerID][id];
 				
 			link.name2 = labelSvg;
 		}
@@ -754,10 +557,16 @@ function addLine(id, pos) {
 			
 			link = {
 				peer1: id,
-				name1: labelSvg,
-				peer2: peerIP,
+				name: labelSvg,
+				peer2: peerID,
 				svg: lineCanvas.appendChild(lineSvg)
 			};
+			
+			const length = lineSvg.getTotalLength();
+			
+			lineSvg.setAttribute("stroke-dasharray", length +" "+ length);
+			
+			setAnimation(lineSvg, length);
 		}
 		
 		// label이 선보다 위에 그려지도록 나중에 붙여줌
@@ -765,7 +574,7 @@ function addLine(id, pos) {
 			lineCanvas.appendChild(labelSvg);
 		}
 		
-		peerList[peerIP] = link;
+		peerList[peerID] = link;
 	}
 }
 
@@ -829,77 +638,22 @@ function initialize() {
 	for (var id in critical) {
 		setGroupStatus(id, "critical");
 	}
-	
-	var id = top.databases.local.selected;
-	
-	if (id) {
-		var pos = window.top.databases.position[id];
-		
-		moveAllDevice(- pos.x, - pos.y);
-		showSelectedDevice(id);
-	}
-	
-	top.databases.local.selected = undefined;
-}
-
-function onLink(id, e) {
-	onEditLine(id, e.detail.peer);
-}
-
-function displayIFName(show) {
-	document.body.classList[show? "add": "remove"]("ifname");
 }
 
 function getIcon(type) {
 	return window.top.databases.icon[type] || window.top.databases.local.icon[type];
 }
 
-(function(print) {
-	window.print = function() {
-		var r = window.mapCanvas.getBoundingClientRect();
-		
-		window.mapCanvas.setAttribute("viewBox", [0, 0, r.width, r.height].join(" "));
-		
-		print();
-		
-		window.mapCanvas.removeAttribute("viewBox");
-	};
-})(window.print);
-
-//abstract
-function onEditDevice(id) {	
-}
-
-//abstract
-function onEditLine(id, peerID) {
-	
-}
-
-//abstract
-function onSelectGroup(id) {	
-}
-
-//abstract
-function onShowChart(id) {
-}
-
-//abstract
-function onShowAlarm(ip) {
-}
-/*
-function resetStatus(id) {
-	
-}*/
 		</script>
 	</head>
 	
-	<body class="loading name ifname">
+	<body class="loading name">
 		<svg id="map">
 			<defs>
 				<circle r="35" id="circle"></circle>
 			</defs>
-			<g class="parent" transform="translate(100, 100)">
-				<circle id="parent" cx="0" cy="0" r="40"></circle>
+			<g id="parent">
+				<circle class="parent" cx="0" cy="0" r="40"></circle>
 				<image class="no_pointer_event" xlink:href="img/group.png" x="-30" y="-30" width="60" height="60"></image>
 			</g>
 			<g id="transform" transform="translate(0, 0) scale(1, 1) translate(0, 0)">
@@ -908,29 +662,9 @@ function resetStatus(id) {
 					<line x1="0" y1="0" x2="0" y2="0" />
 				</g>
 				<g id="device"></g>
-				<!--g id="tool"-->
-					<g id="anchor">
-						<image xlink:href="img/svg/chart.svg" id="chart_anchor" x="-42" y="-8" 
-							width="16" height="16" cursor="pointer"><!-- -34 -16/2, -16/2 -->
-							<title>이 장비의 차트를 봅니다.</title>
-						</image>
-						<image xlink:href="img/svg/information.svg" id="edit_anchor" x="26" y="-8"
-							width="16" height="16" cursor="pointer"><!-- 34 -16/2, -16/2 -->
-							<title>이 장비의 정보를 수정합니다.</title>
-						</image>
-						<image xlink:href="img/svg/anchor.svg" id="link_anchor" class="root" x="-8" y="-42"
-							width="16" height="16" cursor="pointer"><!-- -16/2, -34 -16/2 -->
-							<title>이 앵커를 드래그하여 다른 장비와 연결합니다.</title>
-						</image>
-						<image xlink:href="img/svg/alarm.svg" id="alarm_anchor" class="root" x="-8" y="26"
-							width="16" height="16" cursor="pointer"><!-- -16/2, 34 -16/2 -->
-							<title>성능의 임계값을 설정합니다.</title>
-						</image>
-					</g>
-				<!--/g-->
 			</g>
 		</svg>
-		
+		<button onclick="window.location.reload()" style="position: fixed; right: 10px; bottom: 10px;">reload</button>
 		<script src="js/ITAhM.js"></script>
 		<script src="js/Draggable.js"></script>
 		<script>
@@ -947,17 +681,12 @@ var mapCanvas = document.getElementById("map"),
 	transform = document.getElementById("transform").transform.baseVal,
 	linkCanvas = document.getElementById("link"),
 	linkSVG = linkCanvas.querySelector("line"),
-	anchor = document.getElementById("anchor"),
-	chartAnchor = document.getElementById("chart_anchor"),
-	alarmAnchor = document.getElementById("alarm_anchor"),
-	editAnchor = document.getElementById("edit_anchor"),
-	linkAnchor = document.getElementById("link_anchor"),
 	parentAnchor = document.getElementById("parent"),
 	fragment = document.createDocumentFragment(),
 	linkData = {},
 	svgData = {},
 	checked = {},
-	scale = 1,
+	scale = top.databases.local.scale,
 	isDragging = false;
 
 if (top.databases.local.level === 0) {
@@ -966,49 +695,62 @@ if (top.databases.local.level === 0) {
 
 new Draggable(mapCanvas);
 
-mapCanvas.addEventListener("click", onCancelSelect);
 mapCanvas.addEventListener("dragon", onDragStart);
 mapCanvas.addEventListener("drag", onDragMove);
 mapCanvas.addEventListener("dragoff", onDragEnd);
 
-document.onselectstart = function () {
-	return false;
-}
-	
-chartAnchor.onclick = function (e) {
-	onShowChart(window.selected);
-	
-	e.stopPropagation();
-};
-
-alarmAnchor.onclick = function (e) {
-	onShowAlarm(top.getDB("device", window.selected).ip);
-	
-	e.stopPropagation();
-};
-
-editAnchor.onclick = function (e) {
-	onEditDevice(window.selected);
-	
-	e.stopPropagation();
-};
-
 if (top.databases.local.parent) {
 	document.body.classList.add("submap");
 	
-	parentAnchor.ondblclick = function (e) {
-		onSelectGroup(top.databases.position[top.databases.local.parent].parent);
-	};
+	parentAnchor.onclick = function (e) {
+		top.databases.local.parent = top.databases.position[top.databases.local.parent].parent;
 	
-	parentAnchor.onmouseenter = onEnter.bind(parentAnchor, top.databases.position[top.databases.local.parent].parent);
-	parentAnchor.onmouseleave = onLeave.bind(parentAnchor);
+		window.location.reload();
+	};
 }
-
-resize();
 
 if ("display" in top.databases.config) {
 	document.body.classList[top.databases.config.display == "name"? "add": "remove"]("name");
 }
+
+(function (delay) {
+	var running = false,
+		start;
+	
+	function optimize(timestamp) {
+		if (timestamp - start > delay) {
+			resize();
+			
+			start = undefined;
+		}
+		else {
+			requestAnimationFrame(optimize);
+		}
+	}
+	
+	window.addEventListener("resize", function() {
+		if (running) {
+			return;
+		}
+			
+		running = true;
+	
+		requestAnimationFrame(function(timestamp) {
+			if (isNaN(start)) {
+				start = timestamp;
+				
+				requestAnimationFrame(optimize);
+			}
+			else {
+				start = timestamp;
+			}
+			
+			running = false;
+		});
+	});
+})(300);
+
+resize();
 
 document.body.classList.remove("loading");
 

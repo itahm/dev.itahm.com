@@ -83,12 +83,12 @@ function resize() {
 	window.mapWindow.resize();
 }
 
-function editDevice(key) {
-	top.showDialog.call(window, key && top.databases.device[key].group? "group_dialog.html": "device_dialog.html", key);
+function editDevice(id) {
+	top.showDialog.call(window, id && top.getDB("device", id).group? "/group_dialog.html": "/device_dialog.html", id);
 }
 
 function editLine(id, peerID) {
-	top.showDialog.call(window, "line_dialog.html", id, peerID);
+	top.showDialog.call(window, "/line_dialog.html", id, peerID);
 }
 
 function selectGroup(id) {
@@ -98,7 +98,7 @@ function selectGroup(id) {
 }
 
 function editGroup(name) {
-	top.showDialog.call(window, "group_dialog.html", name);
+	top.showDialog.call(window, "/group_dialog.html", name);
 }
 
 function onSave() {
@@ -125,7 +125,7 @@ function onEvent(ip) {
 }		
 
 function onSetAlarm(ip){
-	top.showDialog.call(window, "critical_dialog.html", ip);
+	top.showDialog.call(window, "/critical_dialog.html", ip);
 }
 
 		</script>
