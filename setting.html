@@ -672,6 +672,14 @@ function initialize() {
 				</ul>
 				<input type="submit" value="적용" class="root">
 			</form>
+			<form id="animation">
+				<h3>애니메이션</h3>
+				<ul>
+					<li><input type="radio" name="animation" value="none" required>없음</li>
+					<li><input type="radio" name="animation" value="trace" required>Trace</li>
+				</ul>
+				<input type="submit" value="적용" class="root">
+			</form>
 		</div>
 
 		<form id="critical">
@@ -828,6 +836,31 @@ document.getElementById("interval").onsubmit = function (e) {
 		});
 	};
 }) (document.getElementById("color"));
+
+
+(function (form) {
+	const animation = form.elements["animation"];
+
+	animation.value = "animation" in window.configData? window.configData.animation: "none";
+	
+	form.onsubmit = function (e) {
+		e.preventDefault();
+		
+		document.body.classList.add("loading");
+
+		top.sendRequest({
+			command: "config",
+			key: "animation",
+			value: animation.value
+		}, function (response) {
+			top.putDB("config", "animation", animation.value);
+
+			alert("대시보드의 애니메이션을 변경하였습니다.");
+
+			document.body.classList.remove("loading");
+		});
+	};
+}) (document.getElementById("animation"));
 
 window.sms.onsubmit = function (e) {
 	e.preventDefault();

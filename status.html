@@ -683,7 +683,7 @@ function createIFaceGuage(admin, oper, index, name, descr, alias, type, bandwidt
 	usageIn = usageIn +"%";
 	usageOut = usageOut +"%";
 	
-	clone.children[1].textContent = name;
+	clone.children[1].textContent = name+"("+index+")";
 	clone.children[2].textContent = alias;
 	clone.children[3].textContent = type + "("+ ITAhM.snmp.ifType[type] +")";
 	clone.children[4].textContent = ITAhM.util.toBPSString(bandwidth);

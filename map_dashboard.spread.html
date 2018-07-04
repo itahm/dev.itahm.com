@@ -48,18 +48,6 @@ text {
 #line line {
 	stroke: #d4af37;
 	stroke-width: 1;
-	animation: 3s blink linear infinite;
-}
-
-@keyframes blink {
-	80% {
-		stroke: #d4af37;
-		stroke-width: 1;
-	}
-	100% {
-		stroke: #ddd;
-		stroke-width: 0.5;
-	}
 }
 
 #line text {
@@ -80,6 +68,22 @@ text {
 
 #device text {
 	font-size: 12px;
+}
+
+#trace >path {
+	stroke: #0f0;
+	fill: none;
+	stroke-width: 2px;
+	animation: 10s trace infinite;
+}
+
+@keyframes trace {
+	50% {
+		stroke-dashoffset: 0;
+	}
+	100% {
+		stroke-dashoffset: 0;
+	}
 }
 
 @keyframes initialize {
@@ -185,6 +189,10 @@ function restoreMap() {
 
 function onDragStart(e) {
 	isDragging = true;
+
+	for (var e; e = window.animation.firstChild;) {
+		window.animation.removeChild(e);
+	}
 }
 
 function onDragMove(e) {
@@ -199,6 +207,8 @@ function onDragEnd(e) {
 	moveAllDevice(matrix.e, matrix.f);
 
 	moveMap(0, 0);
+
+	startAnimation();
 }
 
 function moveAllDevice(x, y) {
@@ -291,7 +301,7 @@ function addDevice(id, pos) {
 		};
 	}
 	else if (monitor && monitor.protocol === "snmp") {
-		svgDevice.onclick = function () { //bind 사용하면 event가 arguments로 따라가서 안됨
+		svgDevice.onclick = function () {
 			top.showStatus(id);
 		};
 	}
@@ -419,13 +429,9 @@ function addLine(id, pos) {
 		if (port) {
 			labelSvg = document.createElementNS(svgNS, "text");
 			
-			if (typeof(port) === typeof({}) && "name" in port && "index" in port) {
-				labelSvg.textContent = port.name;
-
-				labelSvg.onclick = top.showStatus.bind(undefined, id, "throughput", port.index);
-			}
-			else {
-				labelSvg.textContent = port;
+			labelSvg.textContent = port.name;
+			labelSvg.onclick = function () {
+				top.showStatus(id, "throughput", port.index);
 			}
 			
 			moveLabel(labelSvg, pos.x, pos.y, peerPos.x, peerPos.y);
@@ -483,6 +489,70 @@ function setGroupStatus(id, status) {
 	}
 }
 
+function drawAnimation(trace, path) {
+	const d = [];
+	var pos = window.posData[trace[0]];
+
+		d[0] = "M"+ pos.x +" "+ pos.y;
+
+	for (let i=1; i<trace.length; i++) {
+		pos = window.posData[trace[i]];
+
+		d[i] = "L"+ pos.x +" "+ pos.y;
+	}
+
+	path.setAttribute("d", d.join(""));
+
+	const length = path.getTotalLength();
+	
+	path.setAttribute("stroke-dasharray", length +" "+ length);
+	path.setAttribute("stroke-dashoffset", length);
+}
+
+function runAnimation() {
+	const id = this.getAttribute("data-id"),
+		next = this.getAttribute("data-next");
+
+	findNextPeer.call(this, [id], next);
+}
+
+function findNextPeer(trace, id) {
+	const ifEntry = window.posData[id].ifEntry;
+
+	trace[trace.length] = id;
+
+	if (Object.keys(ifEntry).length < 2) {
+		drawAnimation(trace, this);
+	}
+	else {
+		for (let next in ifEntry) {
+			if (trace.indexOf(next) === -1) {
+				findNextPeer.call(this, trace, next);
+			}
+		}
+	}
+}
+
+function startAnimation() {
+	const id = top.getDeviceID("172.16.0.30"),
+		ifEntry = window.posData[id].ifEntry;
+	
+	var path;
+	
+	for (let next in ifEntry) {
+		path = document.createElementNS(svgNS, "path");
+
+		path.setAttribute("data-id", id);
+		path.setAttribute("data-next", next);
+
+		window.animation.appendChild(path);
+
+		runAnimation.call(path);
+
+		path.addEventListener("animationiteration", runAnimation);
+	}
+}
+
 function initialize() {
 	var group = top.databases.local.parent,
 		shutdown = {},
@@ -525,6 +595,8 @@ function initialize() {
 		setGroupStatus(id, "critical");
 	}
 
+	startAnimation();
+
 	document.body.classList.remove("loading");
 
 	mapCanvas.style.animationName = "initialize";
@@ -548,6 +620,7 @@ function getIcon(type) {
 			</g>
 			<g id="transform" transform="translate(0, 0) scale(1, 1) translate(0, 0)">
 				<g id="line"></g>
+				<g id="trace"></g>
 				<g id="link">
 					<line x1="0" y1="0" x2="0" y2="0" />
 				</g>
@@ -574,6 +647,7 @@ var posData = top.getDB("position"),
 	linkSVG = linkCanvas.querySelector("line"),
 	parentAnchor = document.getElementById("parent"),
 	fragment = document.createDocumentFragment(),
+	animation = document.getElementById("trace"),
 	linkData = {},
 	svgData = {},
 	checked = {},

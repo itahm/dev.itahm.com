@@ -27,14 +27,13 @@ body, input, button {
 	margin: 0;
 	padding: 0; 
 }
-
-#area {
-	stroke: #fff;
-	stroke-width: 3px;
-	fill: none;
+#selector >rect {
+	fill: #ddd;
+	fill-opacity: 0.5;
+	transform-origin: left top;
 }
 
-#area:not(.active) {
+#selector:not(.active) {
 	display: none;
 }
 
@@ -96,8 +95,12 @@ text {
 	stroke: #0f0;
 }
 
-#device text {
+g.node >text {
 	font-size: 12px;
+}
+
+:not(#select) >#anchor {
+	display: none;
 }
 
 body.loading g,
@@ -105,32 +108,36 @@ body.loading g,
 	display: none;
 }
 
-.device * {
+g.node * {
 	pointer-events: none;
 }
 
-.device circle.drag {
+g.node circle.drag {
 	pointer-events: none;
 }
 
-.device circle {
+g.node circle {
 	pointer-events: all;
 	stroke-width: 5px;
 	stroke: none;
 	fill: none;
 }
 
-.device.checked circle {
+#select >g.node >circle,
+#check >g.node >circle {
 	fill: #fff;
 }
 
-.device.hover circle,
-#parent.hover {
-	stroke: #0f0;
+#parent {
+	transform-origin: right bottom;
 }
 
-#parent {
+#parent >circle:not(:hover) {
 	stroke: #ddd; stroke-width: 5px;
+}
+
+g.group:hover >circle {
+	stroke: #0f0;
 }
 
 /* 공통 */
@@ -138,14 +145,9 @@ body.loading g,
 	position: fixed; top: 0; right: 0; bottom: 0; left: 0;
 }
 
-.no_pointer_event {
-	pointer-events: none;
-}
-
 body.name tspan:last-child,
 body:not(.name) tspan:first-child,
 body:not(.root) .root,
-body:not(.selected) #anchor,
 body:not(.submap) .parent {
 	display: none;
 }
@@ -173,105 +175,132 @@ function restoreMap() {
 }
 
 function isChecked(svgDevice) {
-	if (!hasClass(svgDevice, "device")) {
+	if (!hasClass(svgDevice, "node")) {
 		svgDevice = svgDevice.parentNode;
 	}
 	
-	return hasClass(svgDevice, "device", "checked");
+	return svgDevice.parentNode === window.checkCanvas || svgDevice.parentNode === window.selectCanvas;
 }
 
-function onEnter(id) {
-	addClass(this, "hover");
-	
-	window.group = id;
-	window.isGroup = true;
-}
+function onMoveGroup(parent) {
+	const posData = top.getDB("position");
+	var pos;
 
-function onLeave() {
-	removeClass(this, "hover");
-	
-	window.isGroup = false;
-}
-
-function deleteIFEntry(id) {
-	var pos = top.databases.position[id];
-	
-	for (var peerIP in pos.ifEntry) {
-		delete top.databases.position[peerIP].ifEntry[id];
-	}
-	
-	top.databases.position[id].ifEntry = {};
-	
-	pos.parent = window.group;
-}
-
-function moveGroup() {
 	if (window.selected) {
-		deleteIFEntry(window.selected);
+		pos = posData[window.selected];
+
+		for (let peerID in pos.ifEntry) {
+			delete posData[peerID].ifEntry[window.selected];
+		}
+
+		pos.ifEntry = {};
+		pos.parent = parent;
 	}
 	
-	for (id in window.checked) {
-		deleteIFEntry(id);
+	for (let id in window.checked) {
+		pos = posData[id];
+
+		for (let peerID in pos.ifEntry) {
+			delete posData[peerID].ifEntry[id];
+		}
+
+		pos.ifEntry = {};
+		pos.parent = parent;
 	}
-	
+
 	window.location.reload();
 }
 
-function moveSelectedDevice(x, y) {
+function moveSelectedDeviceTo(x, y) {
+	const posData = top.getDB("position");
 	var pos;
 	
 	if (window.selected) {
-		pos = moveDevice(window.selected, x, y);
+		pos =posData[window.selected];
 		
+		pos.x += x;
+		pos.y += y;
+
+		window.svgData[window.selected].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
+
 		moveAnchor(pos.x, pos.y);
 	}
 	
-	for (var id in window.checked) {
-		moveDevice(id, x, y);
+	for (let id in window.checked) {
+		pos = posData[id];
+		
+		pos.x += x;
+		pos.y += y;
+
+		window.svgData[id].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
 	}
 }
 
-function moveSelectedDeviceTo(x, y) {
-	var pos;
-	
-	if (window.selected) {
-		pos = top.databases.position[window.selected];
-		
-		pos.x += x;
-		pos.y += y;
-	}
-	
-	for (var id in window.checked) {
-		pos = top.databases.position[id];
-		
-		pos.x += x;
-		pos.y += y;
-	}
-}
-	
 function moveAllDevice(x, y) {
-	var group = top.databases.local.parent, moved, pos;
+	const group = top.getDB("local", "parent"),
+		posData = top.getDB("position");
+	var pos, list, link;
 	
 	top.forEachDB("device", function (id, device) {
-		pos = top.databases.position[id];
+		pos = posData[id];
 		
 		if (pos.parent !== group) {
 			return;
 		}
 		
-		moved = moveDevice(id, x, y);
-		
-		pos.x = moved.x;
-		pos.y = moved.y;
+		pos.x = Math.round((x + pos.x) /10) *10;
+		pos.y = Math.round((y + pos.y) /10) *10;
+	
+		window.svgData[id].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
 	});
 	
 	if (window.selected) {
-		pos = top.databases.position[window.selected];
+		pos = posData[window.selected];
 		
 		moveAnchor(pos.x, pos.y);
 	}
+
+	for (let id in window.linkData) {
+		list = window.linkData[id];
+		
+		for (let peerID in list) {
+			link = list[peerID];
+
+			drawLine(link, posData[link.peer1], posData[link.peer2], id === link.peer2);			
+		}
+	}
 }
-	
+
+function drawLine(link, pos1, pos2, dir) {console.log(dir);
+	link.svg.setAttribute("x1", pos1.x);
+	link.svg.setAttribute("y1", pos1.y);
+	link.svg.setAttribute("x2", pos2.x);
+	link.svg.setAttribute("y2", pos2.y);
+
+	if (dir) {
+		if (link.name) {
+			link.name.setAttribute("x", (pos1.x *2 + pos2.x) /3);
+			link.name.setAttribute("y", (pos1.y *2 + pos2.y) /3);
+		}
+
+		if (link.name2) {
+			link.name2.setAttribute("x", (pos2.x *2 + pos1.x) /3);
+			link.name2.setAttribute("y", (pos2.y *2 + pos1.y) /3);
+		}
+	}
+	else {
+		if (link.name2) {
+			link.name2.setAttribute("x", (pos1.x *2 + pos2.x) /3);
+			link.name2.setAttribute("y", (pos1.y *2 + pos2.y) /3);
+		}
+
+		if (link.name) {
+			link.name.setAttribute("x", (pos2.x *2 + pos1.x) /3);
+			link.name.setAttribute("y", (pos2.y *2 + pos1.y) /3);
+		}
+	}
+}
+
 function onCancelSelect() {
 	if (window.isDragging) {
 		window.isDragging = false;
@@ -293,59 +322,40 @@ function showSelectedDevice(id) {
 	}
 }
 
-function setCheck(id, svgDevice, set) {
-	if (set) {
+function setCheck(id, svgDevice, check) {
+	if (check) {
 		window.checked[id] = svgDevice;
 
-		addClass(svgDevice, "checked");
+		window.checkCanvas.appendChild(svgDevice);
 	}
 	else {
 		delete window.checked[id];
 		
-		removeClass(svgDevice, "checked");
-	}
-}
-
-function onSelectDevice(id, svgDevice, check) {
-	if (!check) {
-		return selectDevice(id, svgDevice);
-	}
-	
-	if (id === window.selected) {
-		resetSeleced();
-	}
-	else if (id in window.checked) {
-		setCheck(id, svgDevice, false);
-	}
-	else {
-		setCheck(id, svgDevice, true);
+		window.deviceCanvas.appendChild(svgDevice);
 	}
 }
 
 function selectDevice(id, svgDevice) {
 	var device = top.getDB("device", id),
 		monitor = device.ip && top.databases.monitor[device.ip],
-		pos = top.databases.position[id];
+		pos = top.getDB("position", id);
 	
 	if (window.selected) {
-		removeClass(window.svgData[window.selected], "checked");
-	}
-	else {
-		document.body.classList.add("selected");
+		window.deviceCanvas.appendChild(window.svgData[window.selected]);
 	}
 	
 	window.selected = id;
 	
 	resetChecked();
 	
-	addClass(window.deviceCanvas.appendChild(svgDevice), "checked");
+	window.selectCanvas.appendChild(svgDevice);
 	
 	window.anchor.setAttribute("class", monitor? monitor.protocol: "none");
 	
 	moveAnchor(pos.x, pos.y);
 }
 
-function drawLine(x, y, data, direct) {
+function _drawLine(x, y, data, direct) {
 	var svgDevice, pos,
 		x1, y1, x2, y2;
 
@@ -374,9 +384,9 @@ function drawLine(x, y, data, direct) {
 		y2 = y;
 	}
 
-	if (data.name1) {
-		data.name1.setAttribute("x", (x1 *2 + x2) /3);
-		data.name1.setAttribute("y", (y1 *2 + y2) /3);
+	if (data.name) {
+		data.name.setAttribute("x", (x1 *2 + x2) /3);
+		data.name.setAttribute("y", (y1 *2 + y2) /3);
 	}
 	
 	if (data.name2) {
@@ -408,9 +418,11 @@ function addDevice(id, pos) {
 	svgDevice.addEventListener("link", onLink.bind(undefined, id));
 	
 	if (device.group) {
-		svgDevice.onmouseenter = onEnter.bind(svgDevice, id);
-		svgDevice.onmouseleave = onLeave.bind(svgDevice);
 		svgDevice.ondblclick = onEnterGroup.bind(svgDevice, id);
+
+		svgDevice.addEventListener("movegroup", onMoveGroup.bind(undefined, id));
+		
+		addClass(svgDevice, "group");
 	}
 	
 	svgName.textContent = device.name || device.ip;
@@ -427,7 +439,7 @@ function addDevice(id, pos) {
 	svgDevice.appendChild(svgIcon);
 	svgDevice.appendChild(svgLabel);
 	
-	addClass(svgDevice, "device");
+	addClass(svgDevice, "node");
 	
 	window.deviceCanvas.appendChild(svgDevice);
 	
@@ -452,14 +464,6 @@ function drawDevice(id) {
 	else {
 		svgIcon.setAttributeNS(xlinkNS, "xlink:href", "/"+ icon.src);
 	}
-}
-
-function getDevice(svgDevice) {
-	if (!hasClass(svgDevice, "device")) {
-		svgDevice = svgDevice.parentNode;
-	}
-	
-	return hasClass(svgDevice, "device")? svgDevice: null;
 }
 
 function addClass(e, className) {
@@ -506,39 +510,23 @@ function hasClass(e, className) {
 	return true;
 }
 
-function moveDevice(id, x, y) {
-	var device = top.getDB("device", id),
-		pos = top.databases.position[id],
-		link = window.linkData[id],
-		data;
-
-	var svgDevice = window.svgData[id];
-	
-	x = Math.round((x + pos.x) /10) *10;
-	y = Math.round((y + pos.y) /10) *10;
-	
-	svgDevice.setAttribute("transform", "translate("+ x +","+ y +")");
-	
-	for (var peerIP in link) {
-		data = link[peerIP];
-	
-		drawLine(x, y, data, data.peer1 === id);
-	}
-	
-	return {
-		x: x,
-		y: y
-	};
-}
-
 function onClickDevice(id, e) {
 	e.stopPropagation();
 	
 	if (window.isDragging) {
 		window.isDragging = false;
 	}
+	else if (!e.ctrlKey) {
+		selectDevice(id, this);
+	}
+	else if (id === window.selected) {
+		resetSeleced();
+	}
+	else if (this.parentNode === window.checkCanvas) {
+		setCheck(id, this, false);
+	}
 	else {
-		onSelectDevice(id, this, e.ctrlKey);
+		setCheck(id, this, true);
 	}
 }
 
@@ -547,24 +535,30 @@ function preventDefault(e) {
 }
 
 function moveAnchor(x, y) {
-	window.anchor.setAttribute("transform", "translate("+ (x) +", "+ (y) +")");
+	window.selectCanvas.appendChild(window.anchor).setAttribute("transform", "translate("+ (x) +", "+ (y) +")");
 }
 
 function resetSeleced() {
-	document.body.classList.remove("selected");
-	
+	if (window.anchor.parentNode === window.selectCanvas) {
+		window.selectCanvas.removeChild(window.anchor);
+	}
+
 	if (window.selected) {
-		removeClass(window.svgData[window.selected], "checked");
+		window.deviceCanvas.appendChild(window.svgData[window.selected]);
 	
 		window.selected = undefined;
 	}
 }
 
 function resetChecked() {
-	for (var id in window.checked) {
-		removeClass(window.checked[id], "checked");
+	const df = document.createDocumentFragment();
+
+	for (let id in window.checked) {
+		df.appendChild(window.checked[id]);
 	}
-	
+
+	window.deviceCanvas.appendChild(df);
+
 	window.checked = {};
 }
 
@@ -572,35 +566,40 @@ function showStatus(index) {
 	top.showStatus();
 }
 
-function moveLabel(labelSvg, x1, y1, x2, y2) {
-	labelSvg.setAttribute("x", (x1 *2 + x2) /3);
-	labelSvg.setAttribute("y", (y1 *2 + y2) /3);
-}
-
 function addLine(id, pos) {
-	var device = top.getDB("device", id),
-		ifEntry = pos.ifEntry,
+	var ifEntry = pos.ifEntry,
 		peerList = {},
-		peerPos, peerIP, link, lineSvg, port, labelSvg;
+		peerPos, peerID, link, lineSvg, port, labelSvg;
 	
 	window.linkData[id] = peerList;
 	
-	for (var peerIP in ifEntry) {
-		peerPos = top.databases.position[peerIP];
+	for (var peerID in ifEntry) {
+		peerPos = top.databases.position[peerID];
 		
-		port = ifEntry[peerIP];
+		port = ifEntry[peerID];
 		
 		if (port) {
 			labelSvg = document.createElementNS(svgNS, "text");
 			
-			labelSvg.textContent = port.name;
+			if (typeof(port) === typeof({}) && "name" in port && "index" in port) {
+				labelSvg.textContent = port.name;
+
+				labelSvg.onclick = top.showStatus.bind(undefined, id, "throughput", port.index);
+			}
+			else {
+				labelSvg.textContent = port;
+			}
 			
-			moveLabel(labelSvg, pos.x, pos.y, peerPos.x, peerPos.y);
+			labelSvg.setAttribute("x", (pos.x *2 + peerPos.x) /3);
+			labelSvg.setAttribute("y", (pos.y *2 + peerPos.y) /3);
+		}
+		else {
+			labelSvg = undefined;
 		}
 		
 		// peer가 먼저 svg 만들었다면 공유
-		if (window.linkData[peerIP]) {
-			link = linkData[peerIP][id];
+		if (window.linkData[peerID]) {
+			link = linkData[peerID][id];
 				
 			link.name2 = labelSvg;
 		}
@@ -614,8 +613,8 @@ function addLine(id, pos) {
 			
 			link = {
 				peer1: id,
-				name1: labelSvg,
-				peer2: peerIP,
+				name: labelSvg,
+				peer2: peerID,
 				svg: lineCanvas.appendChild(lineSvg)
 			};
 		}
@@ -625,7 +624,7 @@ function addLine(id, pos) {
 			lineCanvas.appendChild(labelSvg);
 		}
 		
-		peerList[peerIP] = link;
+		peerList[peerID] = link;
 	}
 }
 
@@ -649,11 +648,12 @@ function setGroupStatus(id, status) {
 }
 
 function initialize() {
-	var group = top.databases.local.parent,
-		device, pos;
+	const posData = top.getDB("position"), 
+		group = top.databases.local.parent;
+	var pos;
 	
-	top.forEachDB("device", function (id, device) {
-		pos = top.databases.position[id];
+	top.forEachDB("device", function (id) {
+		pos = posData[id];
 
 		// 동기화 안된 node의 pos 정보가 없음
 		if (!pos) {
@@ -717,9 +717,9 @@ function onEnterGroup(id) {
 			<defs>
 				<circle r="35" id="circle"></circle>
 			</defs>
-			<g class="parent" transform="translate(100, 100)">
-				<circle id="parent" cx="0" cy="0" r="40"></circle>
-				<image class="no_pointer_event" xlink:href="/img/group.png" x="-30" y="-30" width="60" height="60"></image>
+			<g id="parent" class="parent node group" transform="translate(100, 100)">
+				<circle cx="0" cy="0" r="40"></circle>
+				<image xlink:href="/img/group.png" x="-30" y="-30" width="60" height="60"></image>
 			</g>
 			<g id="transform" transform="translate(0, 0) scale(1, 1) translate(0, 0)">
 				<g id="line"></g>
@@ -727,6 +727,8 @@ function onEnterGroup(id) {
 					<line x1="0" y1="0" x2="0" y2="0" />
 				</g>
 				<g id="device"></g>
+				<g id="check"></g>
+				<g id="select"></g>
 				<g id="anchor">
 					<image xlink:href="/img/svg/information.svg" id="edit_anchor" x="26" y="-8"
 						width="16" height="16" cursor="pointer"><!-- 34 -16/2, -16/2 -->
@@ -742,8 +744,8 @@ function onEnterGroup(id) {
 					</image>
 				</g>
 			</g>
-			<g>
-				<rect id="area"></rect>
+			<g id="selector">
+				<rect x="0" y="0" width="1" height="1"></rect>
 			</g>
 		</svg>
 		<header class="root">
@@ -757,7 +759,6 @@ function onEnterGroup(id) {
 			<img src="/img/minus.png" width="16" height="16" title="맵 축소" id="zoom_out">
 		</nav>
 
-		<button onclick="location.reload();" style="position: fixed; bottom: 10px; right: 10px;">reload</button>
 		<script src="/js/ITAhM.js"></script>
 		<script src="/js/Draggable.js"></script>
 		<script>
@@ -772,6 +773,8 @@ var deviceCanvas = document.getElementById("device"),
 	lineCanvas = document.getElementById("line"),
 	transform = document.getElementById("transform").transform.baseVal,
 	linkCanvas = document.getElementById("link"),
+	selectCanvas = document.getElementById("select"),
+	checkCanvas = document.getElementById("check"),
 	linkSVG = linkCanvas.querySelector("line"),
 	anchor = document.getElementById("anchor"),
 	linkAnchor = document.getElementById("link_anchor"),
@@ -781,7 +784,6 @@ var deviceCanvas = document.getElementById("device"),
 	svgData = {},
 	checked = {},
 	animation,
-	area = document.getElementById("area"),
 	scale = top.databases.local.scale,
 	isDragging = false;
 
@@ -794,8 +796,10 @@ document.onselectstart = function () {
 };
 
 (function () {
-	const mapCanvas = document.getElementById("map");
-	var schedule, oX, oY, rect;
+	const mapCanvas = document.getElementById("map"),
+		selector = document.getElementById("selector"),
+		area = document.querySelector("#selector>rect");
+	var schedule, rect;
 
 	new Draggable(mapCanvas);
 
@@ -805,10 +809,9 @@ document.onselectstart = function () {
 			target = data.target;
 
 		if (data.shiftKey) {
-			addClass(window.area, "active");
+			addClass(selector, "active");
 
-			oX = data.x;
-			oY = data.y;
+			selector.setAttribute("transform", "translate("+ data.x +","+ data.y +")");
 		}
 		else if (window.selected) {
 			if (target === linkAnchor) {
@@ -831,42 +834,71 @@ document.onselectstart = function () {
 			x = data.dragX / window.scale,
 			y = data.dragY / window.scale;
 		
-		if (hasClass(window.area, "active")) {
-			if (data.dragX < 0) {
-				window.area.setAttribute("x", oX + data.dragX);
-				window.area.setAttribute("width", -data.dragX);
-			}
-			else {
-				window.area.setAttribute("x", oX);
-				window.area.setAttribute("width", data.dragX);
-			}
-			
-			if (data.dragY < 0) {
-				window.area.setAttribute("y", oY + data.dragY);
-				window.area.setAttribute("height", -data.dragY);
-			}
-			else {
-				window.area.setAttribute("y", oY);
-				window.area.setAttribute("height", data.dragY);
-			}
+		if (hasClass(window.selector, "active")) {
+			area.setAttribute("transform", "scale("+ data.dragX +","+ data.dragY +")");
 		}
 		else if (isChecked(target)) {
-			var pos;
+			const posData = top.getDB("position"),
+				list = Object.keys(window.checked),
+				moved = [];
 			
 			addClass(target, "drag");
 			
-			moveSelectedDevice(x, y);
+			window.checkCanvas.setAttribute("transform", "translate("+ x +","+ y +")");
+			window.selectCanvas.setAttribute("transform", "translate("+ x +","+ y +")");
+
+			if (window.selected) {
+				list[list.length] = window.selected;
+			}
+
+			list.forEach(function (id) {
+				const pos = posData[id],
+					peerList = window.linkData[id];
+				var link;
+
+				for (let peerID in peerList) {
+					link = peerList[peerID];
+
+					if (link.peer1 === id) {
+						link.svg.setAttribute("x1", pos.x + x);
+						link.svg.setAttribute("y1", pos.y + y);
+					}
+					else {
+						link.svg.setAttribute("x2", pos.x + x);
+						link.svg.setAttribute("y2", pos.y + y);
+					}
+
+					if (moved.indexOf(link) === -1) {
+						moved[moved.length] = link;
+					}
+				}
+			});
+
+			moved.forEach(function (link) {
+				const x1 = parseInt(link.svg.getAttribute("x1")),
+					y1 = parseInt(link.svg.getAttribute("y1")),
+					x2 = parseInt(link.svg.getAttribute("x2")),
+					y2 = parseInt(link.svg.getAttribute("y2"));
+				
+				if (link.name) {
+					link.name.setAttribute("x", (x1 *2 + x2) /3);
+					link.name.setAttribute("y", (y1 *2 + y2) /3);
+				}
+
+				if (link.name2) {
+					link.name2.setAttribute("x", (x2 *2 + x1) /3);
+					link.name2.setAttribute("y", (y2 *2 + y1) /3);
+				}
+			});
 		}
 		else if (target === linkAnchor) {
-			var destination = data.destination,
+			const svgDevice = data.destination.parentNode,
 				pos = top.databases.position[window.selected];
 			
 			linkAnchor.setAttribute("transform", "translate("+ (pos.x + x) +","+ (pos.y + y) +")");
-
-			destination = getDevice(destination);
 			
-			if (destination &&  destination !== window.svgData[window.selected]) {
-				var matrix = destination.transform.baseVal.getItem(0).matrix;
+			if (hasClass(svgDevice, "node") &&  svgDevice !== window.svgData[window.selected]) {
+				var matrix = svgDevice.transform.baseVal.getItem(0).matrix;
 				
 				x = matrix.e;
 				y = matrix.f;
@@ -890,59 +922,65 @@ document.onselectstart = function () {
 
 	mapCanvas.addEventListener("dragoff", function (e) {
 		var data = e.detail,
-			target = data.target,
-			destination = data.destination,
-			eventData = {},
-			event = ITAhM.util.createCustomEvent("link", eventData);
+			target = data.target;
 		
-		if (hasClass(window.area, "active")) {
+		if (hasClass(selector, "active")) {
 			const posData = top.getDB("position");
-			var x = (oX - rect.width /2) /window.scale,
-				y = (oY -rect.height /2) /window.scale,
-				pos, x2, y2;
-			
-			if (data.dragX < 0) {
+			var matrix, x, y, x2, y2;
+
+			matrix = selector.transform.baseVal.getItem(0).matrix;
+
+			x = (matrix.e - rect.width /2) /window.scale;
+			y = (matrix.f - rect.height /2) /window.scale;
+
+			matrix = area.transform.baseVal.getItem(0).matrix;
+
+			if (matrix.a < 0) {
 				x2 = x;
-				x = x + data.dragX /window.scale;
+				x = x + matrix.a /window.scale;
 			}
 			else {
-				x2 = x + data.dragX /window.scale;
+				x2 = x + matrix.a /window.scale;
 			}
 			
-			if (data.dragY < 0) {
+			if (matrix.d < 0) {
 				y2 = y;
-				y = y + data.dragY /window.scale;
+				y = y + matrix.d /window.scale;
 			}
 			else {
-				y2 = y + data.dragY /window.scale;
+				y2 = y + matrix.d /window.scale;
 			}
 
 			for (let id in posData) {
 				pos = posData[id];
 
-				if (x < pos.x && pos.x < x2 && y < pos.y && pos.y < y2) {console.log(id);
+				if (id !== window.selected && x < pos.x && pos.x < x2 && y < pos.y && pos.y < y2) {
 					setCheck(id, window.svgData[id], true);
 				}
 			}
-
-			removeClass(area, "active");
+			
+			removeClass(selector, "active");
 		}
 		else if (isChecked(target)) {
-			var x = Math.round(data.dragX / window.scale /10) *10,
-				y = Math.round(data.dragY / window.scale /10) *10,
-				pos;
+			const svgDevice = data.destination.parentNode,
+				x = Math.round(data.dragX / window.scale /10) *10,
+				y = Math.round(data.dragY / window.scale /10) *10;
 			
 			removeClass(target, "drag");
 			
-			if (window.isGroup) {
-				moveGroup();
+			if (hasClass(svgDevice, "group")) {
+				svgDevice.dispatchEvent(ITAhM.util.createCustomEvent("movegroup"));
 			}
 			else {
 				moveSelectedDeviceTo(x, y);
+
+				window.selectCanvas.setAttribute("transform", "translate(0,0)");
+				window.checkCanvas.setAttribute("transform", "translate(0,0)");
 			}
 		}
 		else if (target === linkAnchor) {
-			var pos = top.databases.position[window.selected];
+			const svgDevice = data.destination.parentNode,
+				pos = top.getDB("position", window.selected);
 			
 			window.anchor.appendChild(linkAnchor);
 			
@@ -950,12 +988,10 @@ document.onselectstart = function () {
 			
 			window.fragment.appendChild(linkSVG);
 			
-			destination = getDevice(destination);
-			
-			if (destination &&  destination !== window.svgData[window.selected]) {
-				eventData.peer = window.selected;
-				
-				destination.dispatchEvent(event);
+			if (hasClass(svgDevice, "node") &&  svgDevice !== window.svgData[window.selected]) {				
+				svgDevice.dispatchEvent(ITAhM.util.createCustomEvent("link", {
+					peer: window.selected
+				}));
 			}
 		}
 		else {
@@ -979,7 +1015,7 @@ document.onselectstart = function () {
 }) ();
 
 document.getElementById("restore").onclick = function () {
-	window.location.href = "/2.0.3.2/dashboard.html";
+	window.location.href = "/dashboard.html";
 }
 
 document.getElementById("add_device").onclick = function () {
@@ -1004,16 +1040,17 @@ document.getElementById("edit_anchor").onclick = function (e) {
 	e.stopPropagation();
 };
 
-if (top.databases.local.parent) {
-	document.body.classList.add("submap");
-	
-	parentAnchor.ondblclick = function (e) {
-		onEnterGroup(top.databases.position[top.databases.local.parent].parent);
-	};
-	
-	parentAnchor.onmouseenter = onEnter.bind(parentAnchor, top.databases.position[top.databases.local.parent].parent);
-	parentAnchor.onmouseleave = onLeave.bind(parentAnchor);
-}
+(function (group) {
+	if (group) {
+		const parent = top.getDB("position", group).parent; 
+
+		parentAnchor.onclick = onEnterGroup.bind(parentAnchor, parent);
+
+		parentAnchor.addEventListener("movegroup", onMoveGroup.bind(parentAnchor, parent));
+
+		document.body.classList.add("submap");
+	}
+}) (top.getDB("local", "parent"));
 
 document.getElementById("zoom_in").onclick = function () {
 	zoom(window.scale *= 1.1);

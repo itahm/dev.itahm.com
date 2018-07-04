@@ -499,7 +499,7 @@ function onUpdate() {
 		if (!window.initialized) {
 			window.initialized = true;
 			
-			window.frame.src = "2.0.3.2/dashboard.html";
+			window.frame.src = "/dashboard.html";
 		}
 	}
 	else {
@@ -619,13 +619,6 @@ function onEvent(e) {
 					monitor.critical = isCritical(critical);
 				}
 
-
-	sendRequest({
-		command: "select",
-		ip: event.ip	
-	}, function (snmp) {console.log(snmp.hrProcessorEntry);
-	});
-
 				break;
 
 			case "shutdown":	
@@ -664,6 +657,10 @@ function onEvent(e) {
 						});
 					}
 					
+				}
+
+				if (!("message" in event)) {
+					event.message = event.ip +" "+ event.protocol +" 등록 "+ (event.test? "성공": "실패");
 				}
 
 				break;
@@ -924,10 +921,10 @@ function cancel() {
 				<nav>
 					<i id="expire"></i>
 					<ul>
-						<li><h1><a href="2.0.3.2/dashboard.html" target="main">대시보드</a></h1>
+						<li><h1><a href="/dashboard.html" target="main">대시보드</a></h1>
 						<li><h1><a href="list.html" target="main">장비목록</a></h1>
 						<li><h1><a href="event.html" target="main">이벤트</a></h1>
-						<li><h1><a href="scrap.html" target="main">스크랩</a></h1>
+						<!--li><h1><a href="scrap.html" target="main">스크랩</a></h1-->
 					</ul>
 					<ul>
 						<li><a id="signout" title="로그아웃">로그아웃</a>
