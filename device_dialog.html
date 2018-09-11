@@ -211,17 +211,22 @@ function onApply(e) {
 			key: "",
 			value: device
 		}, function (data) {
-			const id = Object.keys(data)[0],
-				pos = {
+			const pos = {
 					x: 0,
 					y: 0,
 					ifEntry: {}
-				};
+				},
+				parent = top.getDB("local", "parent");
+			var id;
+
+			for (id in data) {
+				break;
+			}
+
+			top.putDB("position", id, pos)
 			
-			top.databases.position[id] = pos; 
-			
-			if (top.databases.local.parent) {
-				pos.parent = top.databases.local.parent;
+			if (parent) {
+				pos.parent = parent;
 			}
 			
 			saveDevice(id, device);
@@ -240,7 +245,7 @@ function onApply(e) {
 }
 
 function saveDevice(id, device) {
-	top.putDB("device", window.id, device);
+	top.putDB("device", id, device);
 	
 	window.opener && window.opener.reload();
 	
@@ -314,7 +319,7 @@ function onMonitorDevice(e) {
 		if (this.value === "snmp" && Object.keys(top.databases.profile).length === 0) {
 			alert("사용 가능한 프로파일이 존재하지 않습니다.\n"+ "\n" +"먼저 프로파일을 생성하십시오.");
 		}
-		else {		
+		else {
 			return top.sendRequest({
 				command: "put",
 				database: "monitor",
@@ -399,13 +404,14 @@ function initialize(id) {
 		
 			if (monitor) {
 				window.form.elements["monitor"].value = monitor.protocol;
-				
-				window.form.elements["ip"].disabled = true;
 			}
 			else {
 				window.form.elements["monitor"].value = "none";
 			}
 			
+			// ip는 한번 지정하면 변경할 수 없다.
+			window.form.elements["ip"].disabled = true;
+
 			document.body.classList.add("monitor");
 		}
 		

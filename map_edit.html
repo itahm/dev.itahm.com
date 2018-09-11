@@ -163,15 +163,7 @@ function zoom() {
 }
 	
 function moveMap(x, y) {
-	transform.getItem(2).setTranslate(x, y);
-}
 	
-function restoreMap() {
-	var matrix = transform.getItem(2).matrix;
-
-	moveAllDevice(matrix.e, matrix.f);
-
-	moveMap(0, 0);
 }
 
 function isChecked(svgDevice) {
@@ -211,35 +203,11 @@ function onMoveGroup(parent) {
 	window.location.reload();
 }
 
-function moveSelectedDeviceTo(x, y) {
-	const posData = top.getDB("position");
-	var pos;
-	
-	if (window.selected) {
-		pos =posData[window.selected];
-		
-		pos.x += x;
-		pos.y += y;
-
-		window.svgData[window.selected].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
-
-		moveAnchor(pos.x, pos.y);
-	}
-	
-	for (let id in window.checked) {
-		pos = posData[id];
-		
-		pos.x += x;
-		pos.y += y;
-
-		window.svgData[id].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
-	}
-}
-
 function moveAllDevice(x, y) {
 	const group = top.getDB("local", "parent"),
-		posData = top.getDB("position");
-	var pos, list, link;
+		posData = top.getDB("position"),
+		done = [];
+	var pos, peerList, link;
 	
 	top.forEachDB("device", function (id, device) {
 		pos = posData[id];
@@ -261,43 +229,34 @@ function moveAllDevice(x, y) {
 	}
 
 	for (let id in window.linkData) {
-		list = window.linkData[id];
+		peerList = window.linkData[id];
 		
-		for (let peerID in list) {
-			link = list[peerID];
+		for (let peerID in peerList) {
+			link = peerList[peerID];
 
-			drawLine(link, posData[link.peer1], posData[link.peer2], id === link.peer2);			
+			if (done.indexOf(link) === -1) {
+				drawLine(link, posData[link.peer1], posData[link.peer2]);
+
+				done[done.length] = link;
+			}
 		}
 	}
 }
 
-function drawLine(link, pos1, pos2, dir) {console.log(dir);
+function drawLine(link, pos1, pos2) {
 	link.svg.setAttribute("x1", pos1.x);
 	link.svg.setAttribute("y1", pos1.y);
 	link.svg.setAttribute("x2", pos2.x);
 	link.svg.setAttribute("y2", pos2.y);
 
-	if (dir) {
-		if (link.name) {
-			link.name.setAttribute("x", (pos1.x *2 + pos2.x) /3);
-			link.name.setAttribute("y", (pos1.y *2 + pos2.y) /3);
-		}
-
-		if (link.name2) {
-			link.name2.setAttribute("x", (pos2.x *2 + pos1.x) /3);
-			link.name2.setAttribute("y", (pos2.y *2 + pos1.y) /3);
-		}
+	if (link.name) {
+		link.name.setAttribute("x", (pos1.x *2 + pos2.x) /3);
+		link.name.setAttribute("y", (pos1.y *2 + pos2.y) /3);
 	}
-	else {
-		if (link.name2) {
-			link.name2.setAttribute("x", (pos1.x *2 + pos2.x) /3);
-			link.name2.setAttribute("y", (pos1.y *2 + pos2.y) /3);
-		}
 
-		if (link.name) {
-			link.name.setAttribute("x", (pos2.x *2 + pos1.x) /3);
-			link.name.setAttribute("y", (pos2.y *2 + pos1.y) /3);
-		}
+	if (link.name2) {
+		link.name2.setAttribute("x", (pos2.x *2 + pos1.x) /3);
+		link.name2.setAttribute("y", (pos2.y *2 + pos1.y) /3);
 	}
 }
 
@@ -355,46 +314,6 @@ function selectDevice(id, svgDevice) {
 	moveAnchor(pos.x, pos.y);
 }
 
-function _drawLine(x, y, data, direct) {
-	var svgDevice, pos,
-		x1, y1, x2, y2;
-
-	svgDevice = data.svg;
-	
-	if (direct) {
-		pos = top.databases.position[data.peer2];
-		
-		svgDevice.setAttribute("x1", x);
-		svgDevice.setAttribute("y1", y);
-		
-		x1 = x;
-		y1 = y;
-		x2 = pos.x;
-		y2 = pos.y;
-	}
-	else {
-		pos = top.databases.position[data.peer1];
-		
-		svgDevice.setAttribute("x2", x);
-		svgDevice.setAttribute("y2", y);
-		
-		x1 = pos.x;
-		y1 = pos.y;
-		x2 = x;
-		y2 = y;
-	}
-
-	if (data.name) {
-		data.name.setAttribute("x", (x1 *2 + x2) /3);
-		data.name.setAttribute("y", (y1 *2 + y2) /3);
-	}
-	
-	if (data.name2) {
-		data.name2.setAttribute("x", (x2 *2 + x1) /3);
-		data.name2.setAttribute("y", (y2 *2 + y1) /3);
-	}
-}
-
 function addDevice(id, pos) {
 	var device = top.getDB("device", id),
 		svgDevice = document.createElementNS(svgNS, "g"),
@@ -412,7 +331,7 @@ function addDevice(id, pos) {
 	svgBG.setAttribute("r", window.OFFSET_C);
 	svgBG.setAttribute("cx", 0);
 	svgBG.setAttribute("cy", 0);
-	
+
 	svgDevice.setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
 	svgDevice.onclick = onClickDevice.bind(svgDevice, id);
 	svgDevice.addEventListener("link", onLink.bind(undefined, id));
@@ -454,7 +373,6 @@ function drawDevice(id) {
 	var device = top.getDB("device", id),
 		svgDevice = window.svgData[id],
 		svgIcon = svgDevice.querySelector("image"),
-		pos = top.databases.position[id],
 		icon = getIcon(device.type || "unknown"),
 		monitor = device.ip && top.databases.monitor[device.ip];
 	
@@ -663,7 +581,11 @@ function initialize() {
 				ifEntry: {}
 			};
 		}
-		
+		else {
+			pos.x = Math.round(pos.x /10) *10;
+			pos.y = Math.round(pos.y /10) *10;
+		}
+
 		if (pos.parent === group) {
 			addDevice(id, pos);
 		}
@@ -690,14 +612,14 @@ function onLink(id, e) {
 }
 
 function getIcon(type) {
-	return window.top.databases.icon[type] || window.top.databases.local.icon[type];
+	return top.databases.icon[type] || top.databases.local.icon[type];
 }
 
 function onSave() {
 	top.sendRequest({
 		command: "push",
 		database: "position",
-		data: window.top.databases.position
+		data: top.databases.position
 	}, function (response) {
 		alert("구성의 변경사항을 저장하였습니다.");
 	});
@@ -804,6 +726,7 @@ document.onselectstart = function () {
 	new Draggable(mapCanvas);
 
 	mapCanvas.addEventListener("click", onCancelSelect);
+
 	mapCanvas.addEventListener("dragon", function (e) {
 		var data = e.detail,
 			target = data.target;
@@ -831,8 +754,8 @@ document.onselectstart = function () {
 	mapCanvas.addEventListener("drag", function (e) {
 		var data = e.detail,
 			target = data.target,
-			x = data.dragX / window.scale,
-			y = data.dragY / window.scale;
+			x = Math.round(data.dragX / window.scale /10) *10,
+			y = Math.round(data.dragY / window.scale /10) *10;
 		
 		if (hasClass(window.selector, "active")) {
 			area.setAttribute("transform", "scale("+ data.dragX +","+ data.dragY +")");
@@ -916,7 +839,7 @@ document.onselectstart = function () {
 			window.linkSVG.setAttribute("y2", y);
 		}
 		else {
-			moveMap(x, y);
+			window.transform.getItem(2).setTranslate(x, y);
 		}
 	});
 
@@ -962,17 +885,36 @@ document.onselectstart = function () {
 			removeClass(selector, "active");
 		}
 		else if (isChecked(target)) {
-			const svgDevice = data.destination.parentNode,
-				x = Math.round(data.dragX / window.scale /10) *10,
-				y = Math.round(data.dragY / window.scale /10) *10;
-			
+			const svgDevice = data.destination.parentNode;
+
 			removeClass(target, "drag");
 			
 			if (hasClass(svgDevice, "group")) {
 				svgDevice.dispatchEvent(ITAhM.util.createCustomEvent("movegroup"));
 			}
 			else {
-				moveSelectedDeviceTo(x, y);
+				const x = Math.round(data.dragX / window.scale /10) *10,
+					y = Math.round(data.dragY / window.scale /10) *10,
+					posData = top.getDB("position"),
+					list = Object.keys(window.checked);
+				var pos;
+				
+				if (window.selected) {
+					list[list.length] = window.selected;
+				}
+				
+				list.forEach(function (id) {
+					pos = posData[id];
+					
+					pos.x += x;
+					pos.y += y;
+
+					window.svgData[id].setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
+
+					if (id === window.selected) {
+						moveAnchor(pos.x, pos.y);
+					}
+				});
 
 				window.selectCanvas.setAttribute("transform", "translate(0,0)");
 				window.checkCanvas.setAttribute("transform", "translate(0,0)");
@@ -995,7 +937,14 @@ document.onselectstart = function () {
 			}
 		}
 		else {
-			restoreMap();
+			//const matrix = transform.getItem(2).matrix;
+			//moveAllDevice(matrix.e, matrix.f);
+			const x = Math.round(data.dragX / window.scale /10) *10,
+				y = Math.round(data.dragY / window.scale /10) *10;
+	
+			moveAllDevice(x, y);
+
+			transform.getItem(2).setTranslate(0, 0);
 		}
 	});
 

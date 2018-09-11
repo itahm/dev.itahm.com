@@ -5,37 +5,66 @@
 		<title>Test 2</title>
 		<style>
 
+body {
+	animation: test 0.5s cubic-bezier(0, 1.5, 1, 1);
+}
 
+@keyframes test {
+	from {
+		transform: translateY(-100%);
+	}
+}
 		</style>
 	</head>
 	
 	<body>
-		<section>
-			<select id="s1">
-				<option value="a">aaa</option>
-				<option value="b">bbb</option>
-				<option value="c">ccc</option>
-			</select>
-		</section>
-		<section>
-			<select id="s2">
-				<option>aaa</option>
-				<option>bbb</option>
-				<option>ccc</option>
-			</select>
-		</section>
-		
+		<ul>
+			<li>a</li>
+			<li>b</li>
+			<li>c</li>
+			<li>d</li>
+			<li>e</li>
+			<li>f</li>
+			<li>g</li>
+		</ul>
+		<ul>
+			<li>a</li>
+			<li>b</li>
+			<li>c</li>
+			<li>d</li>
+			<li>e</li>
+			<li>f</li>
+			<li>g</li>
+		</ul>
+		<ul>
+			<li>a</li>
+			<li>b</li>
+			<li>c</li>
+			<li>d</li>
+			<li>e</li>
+			<li>f</li>
+			<li>g</li>
+		</ul>
+		<ul>
+			<li>a</li>
+			<li>b</li>
+			<li>c</li>
+			<li>d</li>
+			<li>e</li>
+			<li>f</li>
+			<li>g</li>
+		</ul>
+		<ul>
+			<li>a</li>
+			<li>b</li>
+			<li>c</li>
+			<li>d</li>
+			<li>e</li>
+			<li>f</li>
+			<li>g</li>
+		</ul>
 		<script>
-		const s1 = document.querySelector("#s1");
 		
-		s1.value="b";
-		
-		const s2 = document.querySelector("#s2");
-		
-		s2.value="bbb";
-		
-		console.log(s1.value);
-		console.log(s2.value);
 		</script>
 
 	</body>

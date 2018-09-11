@@ -369,7 +369,7 @@ function createRow(id, device, monitor) {
 		});
 	};
 	
-	row.appendChild(document.createElement("li")).textContent = device.name; // N.0
+	row.appendChild(document.createElement("li")).textContent = device.name + "("+ id +")"; // N.0
 	
 	window.deviceMapping[id] = row;
 	

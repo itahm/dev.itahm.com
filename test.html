@@ -7,30 +7,23 @@
 		<title>ITAhM</title>
 		
 		<style>
-			svg {
-				background-color: yellow;
-			}
-			rect {
-				fill: red;
-			}
+
 		</style>
 		<script>
 
 		</script>
 	</head>
 	<body>
-		<svg width="400" height="400">
-			<g id="g" transform="translate(100, 100)">
-				<rect width="1" height="1" x="0" y="0" transform="scale(-50, 50)"></rect>
-			</g>
-			<path d="M0 50L400 50 M0 100 L400 100M0 150 L400 150M0 200 L400 200M0 250 L400 250
-				M0 300 L400 300M0 350 L400 350M50 0L50 400M100 0L100 400M150 0L150 400
-				M200 0L200 400M250 0L250 400M300 0L300 400M350 0L350 400" stroke="blue"></path>
-		</svg>
-		<button id="b">눌러라</button>
 		<script>
+	const xhl = new XMLHttpRequest();
 
+	xhl.open('post',"http://127.0.0.1:90", true);
+    xhl.withCredentials = true;
+    xhl.onload = function() {
+		console.log(this.status);
+	};
 
+    xhl.send(JSON.stringify({command:"listen"})); 
 		</script>
 	
 	</body>

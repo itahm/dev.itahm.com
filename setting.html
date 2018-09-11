@@ -93,6 +93,18 @@ ul {
 	cursor: default;
 }
 
+#expire:empty {
+	display: none;
+}
+
+#expire:not(:empty)::before {
+	content: "라이선스 만료일: ";
+}
+
+#animation {
+	display: none;
+}
+
 input[type=checkbox] {
 	vertical-align: middle;
 }
@@ -214,44 +226,54 @@ function createItem(src, key, func) {
 }
 
 function initConfig() {
-	var configData = top.databases.config;
+	document.querySelector("input[name=clean]").value = window.configData.clean;
+	document.querySelector("select[name=interval]").value = window.configData.interval || 1;
+	document.querySelector("input[name=top]").value = window.configData.top || 10;
+	document.querySelector("select[name=display]").value = window.configData.display || "name";
+	document.getElementById("java").textContent = window.configData.java;
+	document.getElementById("version").textContent = window.configData.version;
 	
-	document.querySelector("input[name=clean]").value = configData.clean;
-	document.querySelector("select[name=interval]").value = configData.interval || 1;
-	document.querySelector("input[name=top]").value = configData.top || 10;
-	document.querySelector("select[name=display]").value = configData.display || "name";
-	document.getElementById("java").textContent = configData.java;
-	document.getElementById("version").textContent = configData.version;
-	
-	if (load in configData) {
-		document.getElementById("load").textContent = (function (load) {
-			//TODO 시간순으로 제공해야함. 수정할것.
-			return Object.values(load).join(", ");
-		})(configData.load);
+	if ("load" in window.configData) {
+		const orders = [].sort.call(Object.keys(window.configData.load), function (a, b) {
+			return parseInt(b) - parseInt(a);
+		}), load = document.getElementById("load"),
+		text = [], title = [];
+
+		for (let i=0; i<4; i++) {
+			text[text.length] = window.configData.load[orders[i]];
+		}
+
+		load.textContent = text.join(", ") +"...";
+
+		for (let i=4; i<orders.length; i++) {
+			title[title.length] = window.configData.load[orders[i]];
+		}
+		
+		load.title = title.join(", ");
 	}
 	
-	document.getElementById("resource").textContent = configData.resource || 0;
-	document.getElementById("usage").textContent = configData.usage? ITAhM.util.toBytesString(configData.usage): 0;
-	document.getElementById("space").textContent = ITAhM.util.toBytesString(configData.space);
+	document.getElementById("resource").textContent = window.configData.resource || 0;
+	document.getElementById("usage").textContent = window.configData.usage? ITAhM.util.toBytesString(window.configData.usage): 0;
+	document.getElementById("space").textContent = ITAhM.util.toBytesString(window.configData.space);
 	
-	if ("path" in configData) {
-		document.getElementById("path").textContent = configData.path;
+	if ("path" in window.configData) {
+		document.getElementById("path").textContent = window.configData.path;
 	}
 	
-	if ("expire" in configData && configData.expire > 0) {
-		document.getElementById("expire").textContent = new Date(configData.expire).toLocaleString();
+	if ("expire" in window.configData && window.configData.expire > 0) {
+		document.getElementById("expire").textContent = new Date(window.configData.expire).toLocaleString();
 	}
 	
-	if ("custom" in configData) {
-		window.custom.elements["custom"].value = configData.custom.split(",").join(", ") || "";
+	if ("custom" in window.configData) {
+		window.custom.elements["custom"].value = window.configData.custom.split(",").join(", ") || "";
 	}
 	
-	if ("iftype" in configData) {
-		window.iftype.elements["iftype"].value = configData.iftype.split(",").join(", ") || "";
+	if ("iftype" in window.configData) {
+		window.iftype.elements["iftype"].value = window.configData.iftype.split(",").join(", ") || "";
 	}
 	
-	if ("dashboard" in configData) {
-		var resources = configData.dashboard,
+	if ("dashboard" in window.configData) {
+		var resources = window.configData.dashboard,
 			orders = [].sort.call(Object.keys(resources), function (a, b) {
 				return parseInt(b) - parseInt(a);
 			}), resource;
@@ -471,9 +493,7 @@ function onDisableGCM(e) {
 	}
 }
 
-function initialize() {
-	var configData = top.databases.config;
-	
+function initialize() {	
 	initConfig();
 	initCritical();
 	initAccount();
@@ -501,15 +521,57 @@ function initialize() {
 					
 					break;
 				default:
-					return top.notice(this.status);
+					top.notice(this.status);
 				}
 				
 				document.body.classList.remove("loading");
 			});	
 		};
 	
-		form.elements["timer"].value = configData.requestTimer || "10000";
+		form.elements["timer"].value = window.configData.requestTimer || "10000";
 	}) (document.getElementById("request"));
+	
+	(function (form) {
+		function f(timeout, retry) {
+			return (retry << 4) | (0x0f & timeout);
+		}
+
+		form.onsubmit = function (e) {
+			e.preventDefault();
+			
+			document.body.classList.add("loading");
+			
+			top.postRequest({
+				command: "config",
+				key: "health",
+				value: (this.elements["timeout"].value & 0x0f) | (parseInt(this.elements["retry"].value) <<4)
+			}, function () {
+				switch(this.status) {
+				case 200:
+					alert("ICMP Helth 확인 방식을 변경 하였습니다.");
+					
+					break;
+				case 400:
+					alert("현재 버전에서 지원하지 않는 설정입니다.");
+					
+					break;
+				default:
+					top.notice(this.status);
+				}
+				
+				document.body.classList.remove("loading");
+			});	
+		};
+	
+		if ("health" in window.configData) {
+			form.elements["timeout"].value =  0x0f & window.configData.health;
+			form.elements["retry"].value = 0x0f & (window.configData.health >> 4);
+		}
+		else {
+			form.elements["timeout"].value = 10;
+			form.elements["retry"].value = 1;
+		}
+	}) (document.getElementById("health"));
 	
 	if (top.databases.config.gcm !== undefined && top.databases.config.gcm !== null) {
 		document.body.classList.add("gcm");
@@ -538,13 +600,35 @@ function initialize() {
 			<li>데이터베이스 로드 : <span id="load">N/A</span>
 			<li>관리 리소스 갯수 : <span id="resource"></span>
 			<li>전일 디스크 사용량 : <span id="usage"></span>
-			<li>라이센스 만료일 : <span id="expire">N/A</span>
+			<li id="expire"></li>
 		</ul>
 		<h2>일반</h2>
 		<ul class="common box">
 			<li>
+				<form id="health">
+					ICMP Health: <input type="submit" value="적용" class="root">
+					<ul>
+						<li>Timeout(초)
+							<select name="timeout">
+								<option value="1">1
+								<option value="2">2
+								<option value="3">3
+								<option value="5">5
+								<option value="10">10
+							</select>
+						</li>
+						<li>Retry :
+							<select name="retry">
+								<option value="1">1
+								<option value="2">2
+								<option value="3">3
+							</select>
+						</li>
+					</ul>
+				</form>
+			<li>
 				<form id="request">
-					SNMP 요청 주기(초) :
+					SNMP (ICMP) 요청 주기(초) :
 					<select name="timer">
 						<option value="3000">3
 						<option value="10000">10
@@ -676,7 +760,7 @@ function initialize() {
 				<h3>애니메이션</h3>
 				<ul>
 					<li><input type="radio" name="animation" value="none" required>없음</li>
-					<li><input type="radio" name="animation" value="trace" required>Trace</li>
+					<li><input type="radio" name="animation" value="blink" required>Blink</li>
 				</ul>
 				<input type="submit" value="적용" class="root">
 			</form>
@@ -837,7 +921,6 @@ document.getElementById("interval").onsubmit = function (e) {
 	};
 }) (document.getElementById("color"));
 
-
 (function (form) {
 	const animation = form.elements["animation"];
 
@@ -860,6 +943,7 @@ document.getElementById("interval").onsubmit = function (e) {
 			document.body.classList.remove("loading");
 		});
 	};
+	
 }) (document.getElementById("animation"));
 
 window.sms.onsubmit = function (e) {
@@ -963,7 +1047,7 @@ backup.elements["restore"].onchange = function (e) {
 			
 			alert("복구가 완료되었습니다.");
 			
-			top.reload();
+			top.location.reload();
 		});
 	};
 	
@@ -1164,7 +1248,6 @@ document.getElementById("debug").onsubmit = function (e) {
 
 		document.body.classList.add("debug");
 	}
-	else console.log(hex_md5(this.elements["password"].value));
 };
 
 initialize();
