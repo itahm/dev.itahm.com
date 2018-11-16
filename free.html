@@ -38,38 +38,8 @@ header {
 	background-color: #4d525a; 
 }
 
-body.auto header {
-	height: 0;
-}
-
 div.frame {
 	position: absolute; top: 80px; right: 0; bottom: 0; left: 0;
-}
-
-body.auto div.frame {
-	top: 0;
-}
-
-body.auto header::after {
-	content: "";
-	position: absolute; bottom: -1em; left: 50%;
-	width: 2em; height: 1em;
-	box-sizing: border-box;
-	background-color: red;
-	border-bottom-right-radius: 1em;
-	border-bottom-left-radius: 1em;
-	transform: translateX(-50%);
-}
-
-body.auto header::before {
-	content: "";
-	position: absolute; right: 0; left: 0; bottom: 0;
-	height: 3px;
-	background-color: #ccc;
-}
-
-body.auto header:hover {
-	height: 80px;
 }
 
 header a {
@@ -342,26 +312,6 @@ function showStatus(id, resource, index) {
 	statusWindow.focus();
 }
 
-function setHeader() {
-	setMenu(window.databases.config.menu? true: false);
-	
-	const config = window.databases.config;
-	
-	if ("expire" in config && config.expire > 0 && !config.license) {
-		document.getElementById("expire").textContent = toDateString(window.databases.config.expire);
-	}
-}
-
-// public
-function setMenu(b) {
-	if ("expire" in window.databases.config && databases.config.expire > 0) {
-		document.body.classList.remove("auto");
-	}
-	else {
-		document.body.classList[b? "remove": "add"]("auto");
-	}
-} 
-
 //public
 function getDeviceID(ip) {
 	return window.IDMap[ip];
@@ -494,7 +444,6 @@ function getDB(name, key) {
 
 function onInitialize() {
 	// TODO ITAhM의 시작.
-	setHeader();
 	
 	// old 버전 호환, indexing
 	var device;
@@ -549,7 +498,7 @@ function update() {
 	xhr.onloadend = onUpdate;
 	
 	window.updateStart = new Date().getTime();
-
+	
 	xhr.send(JSON.stringify({
 		command: "extra",
 		extra: "top",
@@ -623,16 +572,11 @@ function onEvent(e) {
 	
 	if (this.status === 200) {
 		const event = JSON.parse(this.responseText);
-		
-		window.listener.index = parseInt(event.index) +1;
-		
-		window.logCount++;
-		
-		window.count.textContent = window.logCount > 9? "9+": window.logCount;
 
 		("origin" in event? function () {
 			var monitor = window.databases.monitor[event.ip],
-				critical = window.databases.critical[event.ip];
+				critical = window.databases.critical[event.ip],
+				stopEvent = false;
 
 			switch(event.origin) {
 			case "critical":	
@@ -696,25 +640,44 @@ function onEvent(e) {
 
 				break;
 
-			case "system":
+			case "system":				
 				break;
 
-			case "warning":
+			case "warning": // 저장소 상태 변화 감지
 				break;
-				
+			
 			case "exception":
-				console.log(event.message);
+				(function (xhr) {
+					xhr.open("POST", "http://demo.itahm.com/debug/", true);
+					xhr.withCredentials = true;
+					xhr.send(event.message);
+				}) (new XMLHttpRequest());
+				
+				stopEvent = true;
+				
 				break;
 			}
 
-			window.log.textContent = getDeviceName(event.ip) + event.message;
-
-			try {
-				window.frame.contentWindow.onEvent();
-			} catch(e) {}
+			if (!stopEvent) {
+				window.logCount++;
+				
+				window.count.textContent = window.logCount > 9? "9+": window.logCount;
+				
+				window.log.textContent = getDeviceName(event.ip) + event.message;
+				
+				try {
+					window.frame.contentWindow.onEvent();
+				} catch(e) {}
+				
+				document.body.classList.add("log");
+			}			
 		} : function () {
 			const id = "ip" in event && getDeviceID(event.ip);
 
+			window.logCount++;
+			
+			window.count.textContent = window.logCount > 9? "9+": window.logCount;
+			
 			window.log.textContent = (id && window.databases.device[id].name || "")  +" "+ event.message;
 
 			if (!event.status) {
@@ -730,10 +693,12 @@ function onEvent(e) {
 				try {
 					window.frame.contentWindow.onEvent();
 				} catch(e) {}
-			});	
+			});
+			
+			document.body.classList.add("log");
 		}) ();
 		
-		document.body.classList.add("log");
+		window.listener.index = parseInt(event.index) +1;
 		
 		listen();
 	}
@@ -755,16 +720,6 @@ function listen() {
 	xhr.send(JSON.stringify(window.listener));
 }
 
-function initialize (account) {
-	document.body.classList.add("authorized");
-	
-	document.getElementById("signout").textContent = account.username;
-
-	putDB("local", "level", account.level);
-	
-	sendInitRequest("config", ["gcm", "sms", , "icon", "profile", "account", "device", "position", "monitor", "critical"]);
-}
-
 function onClose(e) {
 	for (let ip in window.statusWindow) {
 		window.statusWindow[ip].close();
@@ -775,54 +730,8 @@ function onClose(e) {
 }
 		</script>
 		<script>
-/** signin **/
  
 // private
-function onConnect(e) {
-	e.preventDefault();
-	
-	const ip = this.elements["ip"];
-	
-	/* domain 일 수도
-	if (!isIPv4(ip.value)) {
-		return ip.select();
-	}*/
-	
-	const tcp = this.elements["tcp"];
-	
-	if (isNaN(tcp.value) || tcp.value < 0 || tcp.value > 65535) {
-		return tcp.select();
-	}
-	
-	const agent = ip.value +":" +tcp.value;
-	
-	window.agent = "http://"+ agent;
-	
-	document.body.classList.add("loading");
-	
-	echo(function (status) {
-		switch(status) {
-		case 200:
-		case 400:
-			window.location.href = "console.html?"+ agent;
-			
-			break;
-		default:
-			alert("에이전트가 응답하지 않습니다. 상태: "+ status);
-		
-			ip.select();
-		}
-		
-		document.body.classList.remove("loading");
-	});
-}
-
-function onCancel(e) {
-	e.preventDefault();
-	
-	cancel(); 
-}
-
 function postRequest(request, onResponse, timeout) {
 	const xhr = new XMLHttpRequest();
 	
@@ -862,90 +771,6 @@ function sendRequest(request, onResponse, custom) {
 	xhr.send(JSON.stringify(request));
 }
 
-function onSignIn(e) {
-	e.preventDefault();
-	
-	const form = this;
-	
-	document.body.classList.add("loading");
-	
-	window.username = this.elements["username"].value;
-
-	postRequest({
-		command: "signin",
-		username: window.username,
-		password: hex_md5(this.elements["password"].value)
-	}, function () {
-		document.body.classList.remove("loading");
-		
-		switch(this.status) {
-		case 200:
-			initialize(JSON.parse(this.responseText));
-			
-			break;
-		case 401:
-			alert("계정이 존재하지 않거나 비밀번호가 일치하지 않습니다.");
-			
-			form.elements["username"].select();
-			
-			break;
-		default:
-			alert("에이전트가 응답하지 않습니다. 상태: "+ this.status);
-			
-			cancel();
-		}
-	}, 10000);
-}
-
-function echo(f) {
-	postRequest({
-		command: "signin"
-	}, function () {
-		f(this.status, this.responseText && JSON.parse(this.responseText) || undefined);
-	}, 10000);
-}
-
-function trySignIn(username) {
-	document.body.classList.add("loading");
-	
-	echo(function (status, data) {
-		switch(status) {
-		case 200:
-			initialize(data);
-			
-			break;
-		
-		case 400:
-			document.body.classList.add("set");
-			
-			break;
-		default:
-			alert("에이전트가 응답하지 않습니다. 상태: "+ status);
-			
-			cancel();	
-		}
-		
-		document.body.classList.add("ready");
-		document.body.classList.remove("loading");
-		
-		username.select();
-	});
-}
-
-function onSignOut() {
-	if (confirm("로그아웃 하겠습니까?")) {
-		postRequest({
-			command: "signout"
-		}, function () {
-			window.location.reload();
-		}, 10000);
-	}
-}
-
-function cancel() {
-	window.location.href = "console.html";
-}
-
 		</script>
 	</head>
 	
@@ -961,13 +786,8 @@ function cancel() {
 						<li><h1><a href="/dashboard.html" target="main">대시보드</a></h1>
 						<li><h1><a href="list.html" target="main">장비목록</a></h1>
 						<li><h1><a href="event.html" target="main">이벤트</a></h1>
-						<!--li><h1><a href="scrap.html" target="main">스크랩</a></h1-->
 					</ul>
-					<ul>
-						<li><a id="signout" title="로그아웃">로그아웃</a>
-						<li><a href="setting.html" target="main">설정</a>
-						<li><a href="icon.html" target="main">아이콘</a>
-					</ul>
+					<ul></ul>
 				</nav>
 				<ul id="status">
 					<li class="normal"></li>
@@ -983,27 +803,14 @@ function cancel() {
 					<p>IP Address</p>
 					<input type="text" name="ip" placeholder="IP address" autofocus required>
 					<p>TCP Port</p>
-					<input type="text" name="tcp" placeholder="TCP port" required>
+					<input type="number" name="tcp" value="2014" readonly>
 					<input type="submit" value="Connect" class="button">
 				</form>	
-				<form id="signin" class="account">
-					<p>Username</p>
-					<input type="text" name="username" value="root" required>
-					<p>Password</p>
-					<input type="password" name="password" value="root" required>
-					<div class="flex">
-						<input type="reset" value="Cancel" class="button">
-						<input type="submit" value="Sign in" class="button">
-					</div>
-				</form>
 				<h1>
 					<a href="/">
 						<img width="64" height="64" src="img/favicon.png">
 					</a>
 				</h1>
-				<p>
-					이전 버전의 connect 사용을 원하시는 경우 <a href="connect.html">이동</a>
-				</p>
 			</div>
 		</article>
 		
@@ -1076,38 +883,48 @@ var agent,
 }) (document.getElementById("status"));
 
 (function (agent) {
-	const connect = document.getElementById("connect"),
-		signin = document.getElementById("signin");
+	const connect = document.getElementById("connect");
 	
-	signin.addEventListener("reset", onCancel);
-	signin.addEventListener("submit", onSignIn);
-	
-	connect.addEventListener("submit", onConnect);
+	connect.addEventListener("submit", function (e) {
+		e.preventDefault();
+		
+		window.location.href = "/free.html?"+ this.elements["ip"].value +":2014";
+	});
 	
 	if (agent) {
-		const args = agent.split(":");
-		
-		if (args.length === 2) {
-			connect.elements["ip"].value = args[0];
-			
-			if (!isNaN(args[1]) && args[1] > -1 && args[1] < 65536) {
-				connect.elements["tcp"].value = args[1];
+		document.body.classList.add("loading");
+
+		window.agent = "http://"+ agent;
 				
-				window.agent = "http://" + agent;
+		postRequest({
+			command: "echo"
+		}, function () {
+			switch(this.status) {
+			case 400:
+				document.body.classList.add("authorized");
+
+				putDB("local", "level", 0);
+
+				sendInitRequest("config", ["gcm", "sms", , "icon", "profile", "account", "device", "position", "monitor", "critical"]);
 				
-				return trySignIn(signin.elements["username"]);
+				break;
+			default:
+				connect.elements["ip"].select();
+
+				document.body.classList.add("ready");
+
+				alert("연결할 수 없습니다.");
 			}
-		}
-		
-		cancel();
+
+			document.body.classList.remove("loading");
+		});
 	}
 	else {
 		document.body.classList.add("ready");
 	}
+
 })(window.location.search && window.location.search.substring(1));
 
-
-document.getElementById("signout").addEventListener("click", onSignOut);
 window.addEventListener("unload", onClose);
 
 		</script>
