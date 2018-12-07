@@ -105,14 +105,14 @@ li:nth-child(1) {
 	flex: none;
 	width: 4em;
 }
-
+/*
 li:nth-child(1) >img {
 	display: block;
 	margin: auto;
 	width: 24px; height: 24px;
 	vertical-align: middle;
 }
-
+*/
 li:nth-child(2) {
 	width: 200px;
 }
@@ -369,7 +369,7 @@ function createRow(id, device, monitor) {
 		});
 	};
 	
-	row.appendChild(document.createElement("li")).textContent = device.name + "("+ id +")"; // N.0
+	row.appendChild(document.createElement("li")).textContent = device.name; // N.0
 	
 	window.deviceMapping[id] = row;
 	

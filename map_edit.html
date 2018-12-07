@@ -634,16 +634,6 @@ function onSave() {
 	});
 }
 
-function _onSave() {console.log(123);
-	top.postRequest({
-		command: "push",
-		database: "position",
-		data: ""
-	}, function () {
-		console.log(arguments);
-	});
-}
-
 function onEnterGroup(id) {
 	top.databases.local.parent = id;
 	

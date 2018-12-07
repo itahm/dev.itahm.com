@@ -4,27 +4,28 @@
 		<meta charset="UTF-8">
 		<meta http-equiv="Cache-Control" content="No-Cache">
 		
-		<title>ITAhM</title>
-		
+		<title>Status @ ITAhM</title>
+
 		<style>
 
+
 		</style>
-		<script>
-
-		</script>
+		
 	</head>
+
 	<body>
-		<script>
-	const xhl = new XMLHttpRequest();
-
-	xhl.open('post',"http://127.0.0.1:90", true);
-    xhl.withCredentials = true;
-    xhl.onload = function() {
-		console.log(this.status);
-	};
-
-    xhl.send(JSON.stringify({command:"listen"})); 
-		</script>
-	
+		<div>
+			<input type="checkbox">
+		</div>
 	</body>
+
+	<script>
+		document.querySelector("div").onclick = function () {
+			console.log(this);
+		}
+
+		document.querySelector("input").onclick = function () {
+			console.log(this);
+		}
+	</script>
 </html>
