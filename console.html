@@ -478,25 +478,36 @@ function forEachDB(name, f) {
 	}
 }
 
-function putDB(name, key, value) {
+function putDB(name) {
 	switch(arguments.length) {
 		case 3:
-			window.databases[name][key] = value;
+			const
+				key = arguments[1],
+				value = arguments[2];
 
-			if (name === "device" && value.ip) {
-				window.IDMap[value.ip] = key;
+			if (value === null) {
+				const value = window.databases[name][key];
+				
+				delete window.databases[name][key];
+
+				if (name === "device" && value.ip) {
+					delete window.IDMap[value.ip];
+				}
+			}
+			else {
+				window.databases[name][key] = value;
+
+				if (name === "device" && value.ip) {
+					window.IDMap[value.ip] = key;
+				}
 			}
 
 			break;
 		case 2:
-			value = window.databases[name][key];
+			const database = arguments[1];
+
+			window.databases[name] = database;
 			
-			delete window.databases[name][key];
-
-			if (name === "device" && value.ip) {
-				delete window.IDMap[value.ip];
-			}
-
 			break;
 	}
 }
@@ -581,20 +592,25 @@ function update() {
 function onInitResponse(table, q) {
 	if (this.status == 200) {
 		window.databases[table] = JSON.parse(this.responseText);
-		
-		table = q.pop();
-		
-		if (table) {
-			sendInitRequest(table, q);
-		}
-		else {
-			onInitialize();
-		}
+	}
+	else if (table === "smtp") {
+		window.databases["smtp"] = {};
 	}
 	else {
 		alert("데이터베이스를 초기화 할 수 없습니다.\n상태: "+ this.status);
 		
 		window.location.href = "/console.html";
+
+		return;
+	}
+
+	table = q.pop();
+	
+	if (table) {
+		sendInitRequest(table, q);
+	}
+	else {
+		onInitialize();
 	}
 }
 
@@ -716,7 +732,7 @@ function onEvent(e) {
 						monitor.protocol = "icmp";
 					}
 					
-					window.databases.monitor[event.ip] = monitor;
+					putDB("monitor", event.ip, monitor);
 				}
 
 				if (!("message" in event)) {
@@ -728,11 +744,18 @@ function onEvent(e) {
 			case "system":
 				break;
 
-			case "warning":
+			case "warning": // 저장소 상태 변화가 감지 되었을때
 				break;
 				
-			case "exception":
-				console.log(event.message);
+			case "error": // snmp status가 오류 상태일때
+				sendRequest({
+					command: "put",
+					database: "monitor",
+					key: event.ip,
+					value: null
+				}, function (data) {
+					putDB("monitor", data);
+				});	
 				
 				break;
 			}
@@ -740,7 +763,7 @@ function onEvent(e) {
 			window.log.textContent = getDeviceName(event.ip) + event.message;
 
 			try {
-				window.frame.contentWindow.onEvent();
+				window.frame.contentWindow.onEvent(event);
 			} catch(e) {}
 		} : function () {
 			const id = "ip" in event && getDeviceID(event.ip);
@@ -758,7 +781,7 @@ function onEvent(e) {
 				window.databases.monitor = data;
 				
 				try {
-					window.frame.contentWindow.onEvent();
+					window.frame.contentWindow.onEvent(event);
 				} catch(e) {}
 			});	
 		}) ();

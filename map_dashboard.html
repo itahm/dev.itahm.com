@@ -157,7 +157,7 @@ function restoreMap() {
 }
 
 function onDragStart(e) {
-	isDragging = true;
+	window.click = false;
 }
 
 function onDragMove(e) {
@@ -256,6 +256,8 @@ function addDevice(id, pos) {
 	
 	svgDevice.setAttribute("transform", "translate("+ pos.x +","+ pos.y +")");
 	
+	svgDevice.onmousedown = setClick;
+
 	if (device.group) {
 		svgDevice.onclick = function() {
 			top.databases.local.parent = id;
@@ -265,7 +267,9 @@ function addDevice(id, pos) {
 	}
 	else if (monitor && monitor.protocol === "snmp") {
 		svgDevice.onclick = function () { //bind 사용하면 event가 arguments로 따라가서 안됨
-			top.showStatus(id);
+			if (window.click) {
+				top.showStatus(id);
+			}
 		};
 	}
 	
@@ -305,7 +309,7 @@ function drawDevice(id) {
 	removeClass(svgDevice, "shutdown", "critical");
 	
 	if (!monitor) {
-		svgIcon.setAttributeNS(xlinkNS, "xlink:href", icon.disabled);
+		svgIcon.setAttributeNS(xlinkNS, "xlink:href", device.application? "/img/setting.png": icon.disabled);
 	}
 	else {
 		svgIcon.setAttributeNS(xlinkNS, "xlink:href", icon.src);
@@ -317,6 +321,10 @@ function drawDevice(id) {
 			addClass(svgDevice, "critical");
 		}
 	}
+}
+
+function setClick() {
+	window.click = true;
 }
 
 function getDevice(svgDevice) {
@@ -570,7 +578,7 @@ var posData = top.getDB("position"),
 	svgData = {},
 	checked = {},
 	scale = top.databases.local.scale,
-	isDragging = false;
+	click = false;
 
 if (top.databases.local.level === 0) {
 	document.body.classList.add("root");

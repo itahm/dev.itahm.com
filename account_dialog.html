@@ -5,7 +5,7 @@
 		<title>dialog</title>
 		
 		<style>
-@import "css/itahm.css";
+@import "css/style.css";
 		
 body {
 	margin: 0; padding: 0;
@@ -16,10 +16,17 @@ body {
 	background-color: rgba(0, 0, 0, .8);
 }
 
-.dialog {
+form {
 	width: 300px;
 	padding: 20px;
 	background-color: #fff;
+	position: relative;
+}
+
+h2 {
+	margin: 0; padding: 10px;
+	background-color: #0084ff;
+	color: #fff;
 }
 
 input[type="text"],
@@ -37,13 +44,13 @@ input[type="checkbox"] {
 }
 
 .table {
-	margin-bottom: 10px;
+	margin: 1em 0;
 }
 
 .table ul {
 	display: flex;
 	list-style: none;
-	padding: 0;
+	padding: 1px;
 	margin: 0;
 }
 
@@ -75,8 +82,25 @@ footer> input:hover {
 	color: #0084ff;
 	border-color: #0084ff;
 }
+#close {
+	font-size: 20px;
+	position: absolute; top: 5px; right: 5px;
+	border: 3px solid transparent;
+}
 
-body:not(.removable) .remove {
+#close:hover {
+	border-color: #c68e17;
+}
+
+#close::before, #close::after {
+	background-color: #c68e17;
+}
+
+.bg_loading {
+	position: absolute;
+}
+
+body:not(.edit) input[type=reset] {
 	display: none;
 }
 
@@ -84,160 +108,154 @@ body:not(.removable) .remove {
 		
 	</head>
 	
-	<body>
+	<body class="loading">
 		
-		<div class="dialog rounded">
-			<form autocomplete="off">
-				<h2>account</h2>
-				<div class="table">
-					<ul>
-						<li>username
-						<li>
-							<input type="text" name="username" class="table text" required>
-					</ul>
-					<ul>
-						<li>password
-						<li>
-							<input type="password" name="password"
-								class="table text"
-								placeholder="new password"
-								pattern=".{6,}"
-								title="at least 6 characters"
-								required>
-							<div>6자 이상</div>
-					</ul>
-					<ul>
-						<li>confirm password
-						<li>
-							<input type="password" name="password2"
-								class="table text"
-								placeholder="confirm password"
-								required>
-					</ul>
-					<ul>
-						<li>level
-						<li>
-							<select name="level">
-								<option value="0">root
-								<option value="2" selected>user
-							</select>
-					</ul>
-				</div>
-				<label class="remove"><input type="checkbox" name="remove" disabled>remove</label>
-				<footer>
-					<input type="reset" value="cancel">
-					<input type="submit" value="apply" disabled>
-				</footer>
-			</form>
-		</div>
-		
+		<form autocomplete="off">
+			<i class="btn_close round" id="close"></i>
+			<h2>account</h2>
+			<div class="table">
+				<ul>
+					<li>username
+					<li>
+						<input type="text" name="username" class="text" required autofocus>
+				</ul>
+				<ul>
+					<li>password
+					<li>
+						<input type="password" name="password"
+							class="text"
+							placeholder="new password"
+							pattern=".{6,}"
+							title="at least 6 characters"
+							required>
+						<div>6자 이상</div>
+				</ul>
+				<ul>
+					<li>confirm password
+					<li>
+						<input type="password" name="password2"
+							class="text"
+							placeholder="confirm password"
+							required>
+				</ul>
+				<ul>
+					<li>level
+					<li>
+						<select name="level">
+							<option value="0">root
+							<option value="2" selected>user
+						</select>
+				</ul>
+			</div>
+			<footer>
+				<input type="reset" value="삭제" disabled>
+				<input type="submit" value="확인" disabled>
+			</footer>
+			<div class="bg_loading"></div>
+		</form>
+
 		<script src="js/md5.js"></script>
 		<script>
 
-var form = document.querySelector("form");
-
-form.addEventListener("reset", onCancel);
-
-if (top.databases.local.level === 0) {
-	form.addEventListener("submit", onApply);
-	
-	document.querySelector("input[type=submit]").disabled = false;
-	
-	form.elements.remove.onclick = onRemove;
-	form.elements.remove.disabled = false;
+function close() {
+	top.closeDialog(true);
 }
 
-
-/**
- * callback method
- */
-function onApply(e) {
-	e.preventDefault();
-	
-	var password = form.elements.password,
-		password2 = form.elements.password2;
+document.addEventListener("keydown", function (e) {
+	switch (e.keyCode) {
+	case 27:
+		close();
 		
-	if (password.value !== password2.value) {
-		alert("password does not match the confirmation");
-		
-		password2.select();
-		
-		return;
+		break;
 	}
-	
-	var username = form.elements.username.value;
-	
-	put(username, {
+});
+
+document.getElementById("close").onclick = close;
+
+if (top.account.level === 0) {
+	document.querySelector("input[type=submit]").disabled = false;
+	document.querySelector("input[type=reset]").disabled = false;
+}
+
+(function (form) {
+	let opener;
+
+	function postRequest(username, account) {
+		document.body.classList.add("loading");
+		
+		top.postRequest({
+			command: "put",
+			database: "account",
+			key: username,
+			value: account
+		}, function (data) {
+			switch (this.status) {
+			case 200:
+				opener && opener.reload();
+				
+				top.closeDialog();
+
+				break;
+			case 409:
+				alert("계정을 삭제할 수 없습니다.\nRoot 레벨 계정이 하나 이상 존재해야 합니다.");
+
+				break;
+			default:
+				alert(top.getMessage(this.status));
+
+				console.log(this.responseText && JSON.parse(this.responseText).error);
+			}
+
+			document.body.classList.remove("loading");
+		});
+	}
+
+	form.onreset = function(e) {
+		e.preventDefault();
+
+		if (confirm("계정을 삭제하겠습니까?")) {
+			postRequest(form.elements.username.value, null);
+		}
+	};
+
+	form.onsubmit = function (e) {
+		e.preventDefault();
+		
+		var password = form.elements.password,
+			password2 = form.elements.password2;
+			
+		if (password.value !== password2.value) {
+			alert("password does not match the confirmation");
+			
+			password2.select();
+			
+			return;
+		}
+		
+		var username = form.elements.username.value;
+		
+		postRequest(username, {
 			username: username,
 			password: hex_md5(password.value),
 			level: parseInt(form.elements.level.value)
 		});
-};
+	};
 
-function onRemove(e) {
-	var accountData = top.databases.account,
-		rootCheck = false;
-	
-	for (var username in accountData) {
-		if (username != form.elements.username.value && accountData[username].level === 0) {
-			rootCheck = true;
+	window.initialize = function (username, account) {
+		opener = this && this.location;
+		
+		if (username) {			
+			form.elements.username.value = username;
+			form.elements.username.disabled = true;
 			
-			break;
+			form.elements.level.value = account.level;
+			
+			document.body.classList.add("edit");
 		}
-	}
-	
-	if (!rootCheck) {
-		alert("루트 레벨 계정이 하나 이상 필요합니다.\n계정을 삭제할 수 없습니다.");
 		
-		return;
-	}
-	
-	if (confirm("계정을 삭제하겠습니까?")) {
-		put(form.elements.username.value, null);
-	}
-	else {
-		this.checked = false;
-	}
-}
-
-function onCancel(e) {
-	top.closeDialog();
-}
-
-function put(username, account) {
-	document.body.classList.add("loading");
-	
-	top.sendRequest({
-		command: "put",
-		database: "account",
-		key: username,
-		value: account
-	}, function (data) {
-		top.databases.account = data;
-		
-		window.opener.reload();
-		
-		top.closeDialog();
-	});
-}
-
-function initialize(username) {
-	window.opener = this.location;
-	
-	if (username) {
-		window.account = top.databases.account[username];
-		
-		form.elements.username.value = username;
-		form.elements.username.disabled = true;
-		
-		form.elements.level.value = account.level;
-		
-		document.body.classList.add("removable");
-	}
-	else {
-		form.elements.username.focus();
-	}
-}
+		document.body.classList.remove("loading");
+	};
+}) (document.querySelector("form"));
 
 		</script>
 	

@@ -2,13 +2,10 @@
 <html>
 	<head>
 		<meta charset="UTF-8">
-		<meta http-equiv="Content-Script-Type" content="text/javascript">
-		<meta http-equiv="Content-Style-Type" content="text/css">
 		<title>Event @ ITAhM</title>
 		
 		<style>
-@import "css/itahm.css";
-@import "css/calendar.css";
+@import "css/style.css";
 
 body {
 	position: fixed; top: 0; right: 0; bottom: 0; left: 0;
@@ -18,8 +15,8 @@ h1, h2 {
 	color: #fff;
 }
 
-.content_width {
-	height: 99%;
+form {
+	width: 1024px; height:100%;
 	padding: 10px;
 	margin: 0 auto;
 	display: flex;
@@ -27,30 +24,20 @@ h1, h2 {
 }
 
 header {
-	position: relative;
+	flex: none;
+	color: #fff;
+	padding: 1em;
+}
+
+input[type=date] {
+	font-family: arial, tahoma, "맑은 고딕";
+	padding: 0.5em;
 }
 
 .log {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-}
-
-header>nav {
-	position: absolute; top: 10px; right: 10px; 
-}
-
-#calendar {
-	position: absolute; top: 0; right: 0;
-	display: none;
-	background-color: #fff;
-	border: 1px solid #0084ff;
-	padding: 5px;
-}
-
-header>nav:hover> #calendar,
-#calendar:hover {
-	display: block;
 }
 
 ul {
@@ -138,17 +125,11 @@ ul {
 	
 	<body class="loading">
 	
-		<div class="content_width">
+		<form class="content_width">
 			
 			<header>
-				<div>
-					<h1>이벤트 로그</h1>
-					<h2 id="date">Date</h2>
-				</div>
-				<nav>
-					<img src="img/calendar512.png" width="36" height="36">
-					<div id="calendar"></div>
-				</nav>
+				날짜 선택 :
+				<input type="date" name="date">
 			</header>
 			
 			<div class="log">
@@ -163,127 +144,111 @@ ul {
 				<div id="list"></div>
 			</div>
 			
-		</div>
+		</form>
 		
 		<div class="bg_loading"></div>
 		
-		<script src="js/ITAhM.js"></script>
-		<script src="js/object.js"></script>
 		<script>
-if (top === window) {
-	throw "";
-}
 
-var iFrame = document.querySelector("iframe"),
-	list = document.getElementById("list"),
-	today = new Date().setHours(0, 0, 0, 0);
-
-top.clearLog();
-
-new ITAhM.Calendar("calendar", function (date) {
-	sendRequest(date.getTime());
-});
-
-sendRequest(today);
-
-function sendRequest(mills) {
-	document.body.classList.add("loading");
+(function (form) {
+	const today = new Date(),
+		list = document.getElementById("list");
 	
-	var log;
-	while(log = window.list.firstChild) {
-		window.list.removeChild(log);
-	}
-	
-	top.sendRequest({
-		command: "extra",
-		extra: "log",
-		date: mills
-	}, function (data) {
-		if (data) {
-			var df = document.createDocumentFragment(),
-				indexArray = Object.keys(data);
-				count = indexArray.length;
-			
-			indexArray = indexArray.sort(function (a, b) {
-				return parseInt(a) - parseInt(b);
-			});
-			
-			for (var i=0; i<count; i++) {
-				df.appendChild(createItem(data[indexArray[i]]));
-			}
-			
-			window.list.appendChild(df);
-			
-			list.scrollTop = list.scrollHeight;		
+	top.clearLog();
+
+	postRequest(today.setHours(0, 0, 0, 0));
+
+	// KST
+	today.setHours(9, 0, 0, 0);
+
+	form.elements["date"].valueAsDate = today;
+
+	form.elements["date"].onchange = function (e) {
+		postRequest(this.valueAsDate.setHours(0, 0, 0, 0));
+	};
+
+	function postRequest(mills) {
+		document.body.classList.add("loading");	
+
+		for(let log; log = window.list.firstChild;) {
+			window.list.removeChild(log);
 		}
+		
+		top.postRequest({
+			command: "log",
+			date: mills
+		}, function () {
+			switch (this.status) {
+			case 200:
+				const
+					data = JSON.parse(this.responseText),
+					df = document.createDocumentFragment(),
+					indexArray = Object.keys(data).sort(function (a, b) {
+						return parseInt(a) - parseInt(b);
+					}),
+					count = indexArray.length;
+				
+				for (let i=0, item; i<count; i++) {
+					if (item = createItem(data[indexArray[i]])) {
+						df.appendChild(item);
+					}
+				}
+				
+				window.list.appendChild(df);
+				
+				list.scrollTop = list.scrollHeight;	
+				
+				document.getElementById("count").textContent = count;
 
-		document.getElementById("count").textContent = count;
+				document.body.classList.remove("loading");
+		
+				break;
+			default:
+				alert(top.getMessage(this.status));
 
-		document.getElementById("date").textContent = getDateString(mills);
+				console.log(this.responseText && JSON.parse(this.responseText).error);
+			}
+		});
+	}
+}) (document.querySelector("form"));
 
-		document.body.classList.remove("loading");
-	});
-}
-
-function getDeviceName(id) {
-	const device = id && top.getDB("device", id);
-
-	return device && device.name || "";
-}
-
-function createItem(log) {
+function createItem(event) {
 	var ul = document.createElement("ul"),
 		icon = ul.appendChild(document.createElement("li")).appendChild(document.createElement("img")),
-		id = "ip" in log && top.getDeviceID(log.ip),
-		name = getDeviceName(id),
 		status = 0;
 	
-	ul.appendChild(document.createElement("li")).textContent = toTimeString(log.date);
-	ul.appendChild(document.createElement("li")).textContent = name || log.ip;
+	ul.appendChild(document.createElement("li")).textContent = toTimeString(event.date);
+	ul.appendChild(document.createElement("li")).textContent = event.name;
 	
-	("origin" in log? function () {
-		switch(log.origin) {
-		case "critical":
-			if (log.critical) {
-				status = 1;
-			}
-
-			break;
-
-		case "shutdown":
-			if (log.shutdown) {
-				status = 2;
-			}
-
-			break;
-
-		case "system":
-
-			break;
-
-		case "test":
-			if (!log.test) {
-				status = 2;
-			}
-
-			break;
-
-		case "monitor":
-			if (!log.monitor) {
-				status = 2;
-			}
-
-			break;
+	switch(event.origin) {
+	case "exception":
+		return;
+		
+	case "critical":
+	case "snmp":
+	case "test":
+		if (!event.status) {
+			status = 1; // orange
 		}
-	} : function () {
-		//이전 버전
-	}) ();
 
-	if (!("message" in log) && ("ip" in log) && ("test" in log) && ("protocol" in log)) {
-		log.message = log.ip +" "+ log.protocol +" 등록 "+ (log.test? "성공": "실패");
+		break;
+	case "status":
+	case "updown":
+		if (!event.status) {
+			status = 2; // red
+		}
+
+		break;
+	case "warning":
+		status = 1; // orange
+
+		break;	
+	case "system":
+		break;
+		default:
 	}
-	
-	ul.appendChild(document.createElement("li")).textContent = log.message;
+
+	ul.appendChild(document.createElement("li")).textContent = event.message;
 
 	ul.classList.add("item");
 	

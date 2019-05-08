@@ -136,7 +136,7 @@ body:not(.removable) .remove {
 		}, function () {
 			switch (this.status) {
 			case 200:
-				top.putDB("smtp", user);
+				top.putDB("smtp", user, null);
 				
 				if (window.opener) {
 					window.opener.reload();

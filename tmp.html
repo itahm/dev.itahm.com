@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+
+@import "/css/style.css";
+
+body {
+    position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+    padding: 0; margin: 0;
+}
+
+canvas {
+    width: 100%; height: 100%;
+}
+			</style>
+			<script src="/js/three.js"></script>
+			<script src="/js/OrbitControls.js"></script>
+        </head>
+        
+        <body>
+            
+        <script>
+
+const
+    renderer = new THREE.WebGLRenderer({
+        antialias: true
+    }),
+    scene = new THREE.Scene,
+    camera = new THREE.PerspectiveCamera(60, 1, 1, 1000), // 시야각이 클수록 외곡
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    
+var light;
+
+renderer.setPixelRatio(window.devicePixelRatio);
+
+document.body.appendChild(renderer.domElement);
+
+scene.add(camera);
+
+controls.enableDamping = true;
+controls.screenSpacePanning = false;
+controls.minDistance = 100;
+controls.maxDistance = 1600;
+//controls.maxPolarAngle = Math.PI /2 -0.1;
+
+light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(1, 1, 1);
+scene.add(light);
+
+//scene.background = loader.load("/img/background.jpg");
+
+camera.position.set(0, 200, 400);
+
+window.addEventListener("resize", onResize);
+const x1 = -100, x2 = 200, y1 = 10, y2 = -200, z1 = -100, z2 = 50;
+const mesh1 = new THREE.Mesh(new THREE.BoxBufferGeometry(50, 50, 40),
+	new THREE.MeshBasicMaterial({
+		color: 0xff0000
+	}));
+	mesh1.position.set(x1, y1, z1);
+	scene.add(mesh1);
+const mesh2 = new THREE.Mesh(new THREE.BoxBufferGeometry(50, 50, 40),
+	new THREE.MeshBasicMaterial({
+		color: 0x00ff00
+	}));
+	scene.add(mesh2);
+	mesh2.position.set(x2, y2, z2);
+const mesh3 = new THREE.Mesh(new THREE.CylinderBufferGeometry(1, 1, 1000, 32, 1, true),
+	new THREE.MeshBasicMaterial({
+		color: 0x0000ff,
+		side:THREE.DoubleSide
+	}));
+scene.add(mesh3);
+
+var v1 = new THREE.Vector3(x1, y1, z1), v2 = new THREE.Vector3(x2, y2, z2);
+const mesh4 = new THREE.Mesh(new THREE.CylinderBufferGeometry(1, 1, v1.distanceTo(v2), 32, 1, true),
+	new THREE.MeshBasicMaterial({
+		color: 0xffff00,
+		side:THREE.DoubleSide
+	}));
+		
+	var o = new THREE.Matrix4(), r = new THREE.Matrix4();
+/*
+	mesh4.position.x = (x1 + x2) /2;
+	mesh4.position.y = (y1 + y2) /2;
+	mesh4.position.z = (z1 + z2) /2;*/
+
+o.lookAt(v1, v2, new THREE.Vector3(0, 1, 0));
+r.makeRotationX(Math.PI /2);
+o.multiply(r);
+
+mesh4.applyMatrix(o);
+
+mesh4.position.copy(v1);
+mesh4.position.lerp(v2, 0.5);
+
+scene.add(mesh4);
+
+const mesh5 = new THREE.Mesh(new THREE.PlaneBufferGeometry(300, 300, 1, 1), 
+	new THREE.MeshBasicMaterial({
+		color: 0xffffff,
+		side:THREE.DoubleSide
+	}));
+
+	mesh5.rotation.x = Math.PI /2;
+	scene.add(mesh5);
+render();
+
+
+function onResize() {
+    const size = document.body.getBoundingClientRect();
+    
+    camera.aspect = size.width / size.height;
+    camera.updateProjectionMatrix();
+    
+    renderer.setSize(size.width, size.height);
+}
+
+function render() {
+    controls.update();
+    
+    renderer.render(scene, camera);
+    
+    requestAnimationFrame(render);
+}
+
+        </script>
+    </body>
+</html>

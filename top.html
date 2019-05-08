@@ -11,19 +11,17 @@
 
 body {
 	color: #fff;
-	animation: fall 1s cubic-bezier(0, 1.5, 1, 1);
 }
 
-@keyframes fall {
-	from {
-		transform: translateY(-100%);
-	}
+section:empty {
+	display: none;
 }
 
-.title {
-	padding: .5em 2em;
-	border-radius: 3px 3px 0 0;
-	border-bottom: none;
+section:not(:empty)::before {
+	content: attr(title);
+	display: block;
+	padding: .5em 2em; margin: 0.5em 0;
+	border-radius: 0.5em 0.5em 0 0;
 	font-weight: bold;
 	color: #fff;
 	background-color: #000;
@@ -57,6 +55,7 @@ ul {
 	flex: 1;
 	box-sizing: border-box;
 	overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	display: flex; align-items: center;
 }
 
 body:not(.name) .list_item> li:nth-child(1),
@@ -79,15 +78,12 @@ body.name .list_item> li:nth-child(2) {
 .list_item> li:last-child >div {
 	position: absolute; top: 0; bottom: 0; left: 0;
 	z-index: -1;
-	animation: gauge 2s;
+	animation: gauge 2s cubic-bezier(0, 1, 1, 1.2);
 }
 
 @keyframes gauge {
-	0% {
-		width: 0;
-	}
-	50% {
-		width: 0;
+	30% {
+		width: 0%;
 	}
 }
 
@@ -95,7 +91,7 @@ body.name .list_item> li:nth-child(2) {
 	border-color: #f00;
 }
 
-#top_list.pastel .list_item> li:last-child.red {
+#list.pastel .list_item> li:last-child.red {
 	border-color: #8e24aa;
 }
 
@@ -103,7 +99,7 @@ body.name .list_item> li:nth-child(2) {
 	background: linear-gradient(to right, rgba(255, 0, 0, 0.5), #f00);
 }
 
-#top_list.pastel .list_item> li:last-child.red >div {
+#list.pastel .list_item> li:last-child.red >div {
 	background: linear-gradient(to right, rgba(142, 36, 170, 0.5), #8e24aa);
 }
 
@@ -111,7 +107,7 @@ body.name .list_item> li:nth-child(2) {
 	border-color: #ffa500;
 }
 
-#top_list.pastel .list_item> li:last-child.orange {
+#list.pastel .list_item> li:last-child.orange {
 	border-color: #f6bf26;
 }
 
@@ -119,7 +115,7 @@ body.name .list_item> li:nth-child(2) {
 	background: linear-gradient(to right, rgba(255, 165, 0, 0.5), #ffa500);
 }
 
-#top_list.pastel .list_item> li:last-child.orange >div {
+#list.pastel .list_item> li:last-child.orange >div {
 	background: linear-gradient(to right, rgba(246, 191, 38, 0.5), #f6bf26);
 }
 
@@ -127,7 +123,7 @@ body.name .list_item> li:nth-child(2) {
 	border-color: #0f0;
 }
 
-#top_list.pastel .list_item> li:last-child.green {
+#list.pastel .list_item> li:last-child.green {
 	border-color: #00897b;
 }
 
@@ -135,12 +131,8 @@ body.name .list_item> li:nth-child(2) {
 	background: linear-gradient(to right, rgba(0, 255, 0, 0.5), #0f0);
 }
 
-#top_list.pastel .list_item> li:last-child.green >div {
+#list.pastel .list_item> li:last-child.green >div {
 	background: linear-gradient(to right, rgba(0, 137, 123, 0.5), #00897b);
-}
-
-#tmp_list {
-	display: none;
 }
 
 		</style>
@@ -148,35 +140,58 @@ body.name .list_item> li:nth-child(2) {
 		<script>
 
 function initialize() {
-	const df = document.createDocumentFragment();
-	let resource;
+	const list = document.getElementById("list");
 	
-	if ("dashboard" in top.databases.config) {
-		var resources = top.databases.config.dashboard,
-			order = Object.keys(resources);
-		
-		[].sort.call(order, function (a, b) {
-			return parseInt(a) - parseInt(b);
-		})
-		
-		for (var i=0, _i=order.length; i<_i; i++) {
-			resource = resources[order[i]];
-
-			setTop(top.topList[resource], df.appendChild(document.getElementById(resource)));
-		}
-	}
-	else {
-		const list = document.getElementById("tmp_list");
-		let section;
-
-		while (section = list.firstElementChild) {
-			resource = section.id;
-
-			setTop(top.topList[resource], df.appendChild(section));
-		}
+	if ("color" in top.setting) {
+		list.classList.add(top.setting.color);
 	}
 
-	window.list.appendChild(df);
+	if ("dashboard" in top.setting) {
+		const df = document.createDocumentFragment();
+
+		top.setting.dashboard.forEach(id => {
+			df.appendChild(document.getElementById(id));
+		});
+
+		[].forEach.call(list.querySelectorAll("section"), section =>{
+			list.removeChild(section);
+		});
+
+		list.appendChild(df);
+	}
+
+	[].forEach.call(list.querySelectorAll("section"), section => {
+		section.draggable = true;
+		
+		section.addEventListener("dragstart", function (e) {
+			e.stopPropagation();
+			
+			window.draggable = this;
+		});
+		
+		section.addEventListener("dragover", function (e) {
+			e.preventDefault();
+			
+			if (window.draggable === this) {
+				return;
+			}
+			
+			switch (window.draggable) {
+			case this.previousElementSibling:
+				this.parentNode.insertBefore(this, window.draggable);
+				
+				break;
+			default:
+				this.parentNode.insertBefore(window.draggable, this);
+			}
+
+			top.setting.dashboard = [];
+
+			[].forEach.call(list.querySelectorAll("section"), section => {
+				top.setting.dashboard.push(section.id);
+			});
+		});
+	});
 }
 
 function toErrorString(value) {
@@ -225,46 +240,43 @@ function toBPSString(bandwidth) {
 	return bandwidth.toFixed(2) + unit[i];
 }
 
-function setTop(topData, section) {
+function setTop(topList, section) {
+	if (!section) {
+		return;
+	}
+
 	const
 		skipZero = section.dataset.zero,
 		sortByRate = section.dataset.rate,
-		toString = window[section.dataset.func],
-		list = Object.keys(topData).sort(function (a, b) {
-			if (sortByRate) {
-				return topData[b].rate - topData[a].rate;
-			}
-			else {
-				return topData[b].value - topData[a].value;
-			}
-		}),
-		max = "top" in top.databases.config? Math.min(top.databases.config.top, list.length): list.length;
+		toString = window[section.dataset.func];
 
-	for (let i=0, ip, value; i< max; i++) {
-		ip = list[i];
-		value = topData[ip];
-		
-		if (value.value || !skipZero) {
-			section.appendChild(createTopItem(ip, toString(value.value), value.rate, section.id, value.index));
-		}
+	for (let item; item = section.firstChild;) {
+		section.removeChild(item);
 	}
+
+	topList.forEach(map => {
+		var value;
+
+		for (let id in map) {
+			value = map[id];
+
+			if (value.value || !skipZero) {
+				section.appendChild(createTopItem(id, toString(value.value), value.rate, section.id, value.index));
+			}
+		}
+	});
 }
 
-function createTopItem(ip, value, rate, resource, index) {
-	var item = document.createElement("ul"),
-		id = top.getDeviceID(ip),
+function createTopItem(id, value, rate, resource, index) {
+	var 
+		base = parent.node[id],
+		item = document.createElement("ul"),
 		bar;
 
-	if (!id) {
-		console.log("서버와 동기화 실패 node: "+ ip);
-
-		return item;
-	}
-	
 	item.className = "list_item";
 	
-	item.appendChild(document.createElement("li")).textContent = top.getDB("device", id).name || ip;
-	item.appendChild(document.createElement("li")).textContent = ip;
+	item.appendChild(document.createElement("li")).textContent = base.name || base.ip || id;
+	item.appendChild(document.createElement("li")).textContent = base.ip;
 	
 	bar = item.appendChild(document.createElement("li"));
 	bar.dataset.value = value;
@@ -283,8 +295,8 @@ function createTopItem(ip, value, rate, resource, index) {
 	
 	bar.onclick = function (e) {
 		e.stopPropagation();
-		console.log(resource);
-		top.showStatus(id, resource, index);
+		
+		top.showStatus(id, resource.replace("Rate", ""), index);
 	}
 	
 	return item;
@@ -295,91 +307,62 @@ function createTopItem(ip, value, rate, resource, index) {
 	</head>
 	
 	<body class="name">
-		<div id="top_list"></div>
-		
-		<div id="tmp_list">
-			<section id="responseTime" data-func="toMillsString">
-				<div class="title">응답시간</div>
-				<div class="list"></div>
-			</section>
-			<section id="processor" data-func="toPercentageString">
-				<div class="title">프로세서 로드</div>
-				<div class="list"></div>
-			</section>
-			<section id="memory" data-func="toBytesString">
-				<div class="title">메모리 사용량</div>
-				<div class="list"></div>
-			</section>
-			<section id="memoryRate" data-func="toBytesString" data-rate="true">
-				<div class="title">메모리 사용율(%)</div>
-				<div class="list"></div>
-			</section>
-			<section id="storage" data-func="toBytesString">
-				<div class="title">저장공간 사용량</div>
-				<div class="list"></div>
-			</section>
-			<section id="storageRate" data-func="toBytesString" data-rate="true">
-				<div class="title">저장공간 사용율(%)</div>
-				<div class="list"></div>
-			</section>
-			<section id="throughput" data-func="toBPSString">
-				<div class="title">통신 사용량</div>
-				<div class="list"></div>
-			</section>
-			<section id="throughputRate" data-func="toBPSString" data-rate="true">
-				<div class="title">통신 사용율(%)</div>
-				<div class="list"></div>
-			</section>
-			<section id="throughputErr" data-func="toErrorString" data-zero="true">
-				<div class="title">통신 오류</div>
-				<div class="list"></div>
-			</section>
-			<section id="failureRate" data-func="toPercentageString" data-zero="true">
-				<div class="title">SNMP 오류</div>
-				<div class="list"></div>
-			</section>
+		<div id="list">
+			<section id="responseTime" data-func="toMillsString" title="응답시간"></section>
+			<section id="processor" data-func="toPercentageString" title="프로세서 로드"></section>
+			<section id="memory" data-func="toBytesString" title="메모리 사용량"></section>
+			<section id="memoryRate" data-func="toBytesString" data-rate="true" title="메모리 사용율(%)"></section>
+			<section id="storage" data-func="toBytesString" title="저장공간 사용량"></section>
+			<section id="storageRate" data-func="toBytesString" data-rate="true" title="저장공간 사용율(%)"></section>
+			<section id="throughput" data-func="toBPSString" title="통신 사용량"></section>
+			<section id="throughputRate" data-func="toBPSString" data-rate="true" title="통신 사용율(%)"></section>
+			<section id="throughputErr" data-func="toErrorString" data-zero="true" title="통신 오류"></section>
 		</div>
 		
 		<script>
 
-var list = document.getElementById("top_list"),
+const INTERVAL = 8000;
+var request = {
+		command: "order",
+		order: "top"
+	},
 	rafID;
 
-(function (configData) {
-	if ("display" in configData && configData.display !== "name") {
-		document.body.classList.remove("name");
-	}
+if ("display" in top.setting && top.setting.display !== "name") {
+	document.body.classList.remove("name");
+}
 
-	if ("color" in configData) {
-		window.list.classList.add(configData.color);
-	}
-}) (top.databases.config);
+if (top.store.parent) {
+	window.request.top = parent.topList;
+}
 
 initialize();
 
 function reload() {
-	const rafID = 
-	window.rafID = requestAnimationFrame(function reload(elapsed) {
-		if (elapsed > 8000) {
-			if (rafID == window.rafID) {
-				window.location.reload();
+	top.postRequest(window.request, function () {
+		switch (this.status) {
+		case 200:
+			const map = JSON.parse(this.responseText);
+
+			for (let id in map) {
+				setTop(map[id], document.getElementById(id));
 			}
-		}
-		else {
-			requestAnimationFrame(reload);
+
+			break;
+		default:
+			alert(top.getMessage(this.status));
+
+			console.log(this.responseText && JSON.parse(this.responseText).error);
 		}
 	});
+
+	setTimeout(() => {
+		requestAnimationFrame(reload);
+	}, INTERVAL);
 }
 
-window.list.onmouseenter = function () {
-	window.rafID = undefined;
-};
-
-window.list.onmouseleave = function () {
-	reload();
-};
-
 reload();
+
 
 		</script>
 	

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>dialog</title>
+		
+		<style>
+@import "css/style.css";
+
+body {
+	font-family: arial, tahoma, "맑은 고딕"; font-size: 10pt;
+	margin: 0; padding: 0;
+	position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: rgba(0, 0, 0, .8);
+}
+
+form {
+	width: 300px;
+	padding: 20px;
+	background-color: #fff;
+	position: relative;
+}
+
+h2 {
+	margin: 0; padding: 10px;
+	background-color: #0084ff;
+	color: #fff;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="submit"],
+input[type="reset"],
+select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: .5em;
+}
+
+input[type="checkbox"] {
+	vertical-align: middle;
+}
+
+div.table {
+	margin: 1em 0;
+}
+
+div.table ul {
+	display: flex;
+	align-items: center;
+	list-style: none;
+	padding: 1px;
+	margin: 0;
+}
+
+div.table li:first-child {
+	text-align: right;
+	padding: .5em;
+	flex: 2;
+}
+
+div.table li:last-child {
+	flex: 3;
+}
+
+footer {
+	margin-top: 1em;
+	display: flex;
+}
+
+footer> input {
+	flex: 1;
+	border-radius: 1.2em;
+	background-color: #0084ff;
+	color: #fff;
+	border: .2em solid transparent;
+	padding: .5em;
+}
+
+footer> input:hover {
+	background-color: #fff;
+	color: #0084ff;
+	border-color: #0084ff;
+}
+
+#close {
+	font-size: 20px;
+	position: absolute; top: 5px; right: 5px;
+	border: 3px solid transparent;
+}
+
+#close:hover {
+	border-color: #c68e17;
+}
+
+#close::before, #close::after {
+	background-color: #c68e17;
+}
+
+body:not(.edit) input[type=reset] {
+	display: none;
+}
+
+		</style>
+
+		<script>
+		
+function isIPv4(s) {
+    return s.match(/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/)? true: false;
+}
+
+		</script>
+
+	</head>
+	
+	<body class="loading">
+	
+		<form autocomplete="off">
+			<i class="btn_close round" id="close"></i>
+			<h2>응용프로그램</h2>
+			<div class="table">
+				<ul>
+					<li>IP 주소
+					<li>
+						<input type="text" name="ip" class="table text"
+							pattern="(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+							placeholder="IP Address" required autofocus>
+					
+				</ul>
+				<ul>
+					<li>TCP 포트
+					<li>
+						<input type="number" max="65535" min="1" name="tcp" class="table text"
+							placeholder="TCP Address" title="Number(1 ~ 65535)" required>
+					
+				</ul>
+				<ul>
+					<li>타입
+					<li>
+						<select name="type" required></select>
+					
+				</ul>
+				<ul>
+					<li>응용프로그램명
+					<li>
+						<input type="text" name="name" class="table text"
+							placeholder="">
+					
+				</ul>
+			</div>
+			<footer>
+				<input type="reset" value="삭제" disabled>
+				<input type="submit" value="확인" disabled>
+			</footer>
+		</form>
+		
+		<div class="bg_loading"></div>
+		<script>
+
+if (top.account.level === 0) {
+	document.querySelector("input[type=submit]").disabled = false;
+	document.querySelector("input[type=reset]").disabled = false;
+}
+
+function close() {
+	top.closeDialog(true);
+}
+
+document.addEventListener("keydown", function (e) {
+	switch (e.keyCode) {
+	case 27:
+		close();
+		
+		break;
+	}
+});
+
+document.getElementById("close").onclick = close;
+
+(function (form) {
+	(e => {
+		const
+			df = document.createDocumentFragment(),
+			map = {};
+			
+		for (type in top.store.icon) {
+			map[type] = ("icon" in top.setting && type in top.setting.icon? top.setting.icon: top.store.icon)[type];
+		}
+		
+		for (type in map) {
+			if (map[type].group !== "application") {
+				continue;
+			}
+			
+			df.appendChild(document.createElement("option")).text = type;
+		}
+		
+		e.appendChild(df);
+
+		e.selectedIndex = -1;
+	}) (form.elements["type"]);
+	
+	form.onreset = function(e) {
+		e.preventDefault();
+
+		if(!confirm("응용프로그램 정보를 삭제하겠습니까?")) {
+			return;
+		}
+
+		document.body.classList.add("loading");
+
+		// 삭제
+		top.postRequest({
+			command: "put",
+			database: "node",
+			key: window.id,
+			value: null
+		}, function () {
+			switch (this.status) {
+			case 200:
+				removeOpenerPos();
+
+				reloadOpener();
+
+				break;
+			default:
+				alert(top.getMessage(this.status));
+
+				console.log(this.responseText && JSON.parse(this.responseText).error);
+			}
+		});
+	};
+
+	document.getElementById("close").onclick = function () {
+		top.closeDialog(true);
+	};
+
+	form.onsubmit = function (e) {
+		e.preventDefault();
+	
+		document.body.classList.add("loading");
+
+		const
+			ip = form.elements["ip"].value,
+			tcp = form.elements["tcp"].value.toString(),
+			base = {
+				role: "application",
+				ip: ip +":"+ tcp,
+				type: form.elements["type"].value,
+				name: form.elements["name"].value
+			};
+			
+		top.postRequest({
+			command: "put",
+			database: "node",
+			key: window.id || "",
+			value: base
+		}, function () {
+			switch (this.status) {
+			case 200:
+				reloadOpener();
+
+				break;
+			case 409:
+				alert("사용중인 TCP/IP 주소 입니다.");
+
+				form.elements["ip"].select();
+
+				break;
+			default:
+				alert(top.getMessage(this.status));
+
+				console.log(this.responseText && JSON.parse(this.responseText).error);
+			}
+
+			document.body.classList.remove("loading");
+		});
+	};
+
+	// public
+	window.initialize = function (id) {
+		const opener = this;
+
+		window.removeOpenerPos = function () {
+			opener.removePos(id);
+		};
+
+		window.reloadOpener = function () {
+			opener.saveTmpReload();
+			
+			close();
+		};
+		
+		window.id = id;
+
+		if (id) {
+			top.postRequest({
+				command: "node",
+				id: id
+			}, function () {
+				switch (this.status) {
+				case 200:
+					const
+						base = JSON.parse(this.responseText),
+						ip = form.elements["ip"],
+						tcp = form.elements["tcp"],
+						name = form.elements["name"],
+						address = base.ip.split(":");
+					
+					// ip는 한번 지정하면 변경할 수 없다.
+					ip.value = address[0];
+					ip.disabled = true;
+
+					tcp.value = address[1];
+					tcp.disabled = true;
+
+					name.value = base.name || "";
+					name.select();
+
+					form.elements["type"].value = base.type;
+
+					document.body.classList.add("edit");
+
+					break;
+
+				default:
+					alert(top.getMessage(this.status));
+
+					console.log(this.responseText && JSON.parse(this.responseText).error);
+				}
+
+				document.body.classList.remove("loading");
+			});
+		}
+		else {
+			document.body.classList.remove("loading");
+		}
+	};
+
+}) (document.querySelector("form"));
+
+		</script>
+	
+	</body>
+	
+</html>
